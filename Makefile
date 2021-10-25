@@ -11,6 +11,9 @@ CFLAGS+=-Wall
 CFLAGS+=-Wextra
 CFLAGS+=-pedantic
 
+LDFLAGS = -L/usr/local/lib
+LDLIBS  = -lm -lSDL2
+
 exe = bin/chip8
 sources = $(wildcard src/*.c)
 headers = $(wildcard src/*.h)
@@ -20,4 +23,4 @@ all: $(exe)
 
 $(exe): $(sources) $(headers)
 	@mkdir -p bin
-	$(CC) $(CFLAGS) -o $@ $(sources)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(sources) $(LDLIBS)
