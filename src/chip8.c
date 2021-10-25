@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define PIXEL_SCALE_FACTOR 8
@@ -73,13 +74,45 @@ void draw_display(chip8_screen *screen, bool display[DISPLAY_HEIGHT][DISPLAY_WID
 	SDL_RenderPresent(screen->renderer);
 }
 
-int main()
+void load_rom(char* filename, uint8_t mem[4096])
 {
+	FILE* fp = fopen(filename, "rb");
+
+	if (fp == NULL) {
+		perror("loading ROM file");
+		exit(EXIT_FAILURE);
+	}
+
+	struct stat st;
+	stat(filename, &st);
+	size_t fsize = st.st_size;
+
+	// Memory up to 0x200 is reserved for internal use
+	size_t bytes_read = fread(mem + 0x200, 1, sizeof(uint8_t*) * 4096 - 0x200, fp);
+
+	if (bytes_read != fsize) {
+		fprintf(stderr, "failed loading ROM into memory. %ld != %ld\n", bytes_read, fsize);
+		exit(EXIT_FAILURE);
+	}
+
+	fclose(fp);
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc != 2) {
+		fprintf(stderr, "Usage: %s <rom-file>\n", argv[0]);
+		return 1;
+	}
+
 	chip8_state state;
 	init_state(&state);
 
 	chip8_screen screen;
 	init_screen(&screen);
+
+	// Load ROM into memory
+	load_rom(argv[1], state.mem);
 
 	// Draw simple rectangle for testing
 	state.display[32][16] = 1;
@@ -88,11 +121,7 @@ int main()
 	while (true) {
 		SDL_Event event;
 
-		// check for event
 		while (SDL_PollEvent(&event)) {
-			// get snapshot of current state of the keyboard
-			const Uint8* state = SDL_GetKeyboardState(NULL);
-
 			switch (event.type) {
 			case SDL_QUIT:
 				SDL_DestroyWindow(screen.window);
