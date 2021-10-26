@@ -244,8 +244,37 @@ void processor_cycle(chip8_state *state)
 	case 0x6: // 0x6XNN: Set register VX to NN
 		state->V[x] = nn;
 		break;
-	case 0x7: // 0x7XNN: Add NN to register VX
+	case 0x7: // 0x7XNN: Add NN to register VX, ignoring carry
 		state->V[x] += nn;
+		break;
+	case 0x8:
+		switch (n) {
+		case 0: // 0x8XY0: Set VX to VY
+			state->V[x] = state->V[y];
+			break;
+		case 1: // 0x8XY1: Set VX to VX | VY
+			state->V[x] |= state->V[y];
+			break;
+		case 2: // 0x8XY2: Set VX to VX & VY
+			state->V[x] &= state->V[y];
+			break;
+		case 3: // 0x8XY3: Set VX to VX XOR VY
+			state->V[x] ^= state->V[y];
+			break;
+		case 4: // 0x8XY4: Set VX to VX + VY, accounting for carry
+			// If the sum of vx and vx is less than one of
+			// the operands (we pick vx arbitrarily), then
+			// we saw overflow.
+			state->V[0xF] = ((state->V[x] + state->V[y]) < state->V[x]) ? 1 : 0;
+			state->V[x] += state->V[y];
+			break;
+		case 5: // 0x8XY5: Set VX to VX +-VY, accounting for carry
+			// TODO
+			printf("TODO\n");
+			break;
+		default:
+			exit_unknown_instruction(instruction, state->program_counter);
+		}
 		break;
 	case 0xA: // 0xANNN: Set index register to NNN
 		state->index_register = nnn;
