@@ -162,11 +162,25 @@ void processor_cycle(chip8_state *state)
 	uint16_t instruction = state->mem[state->program_counter] << 8 | state->mem[state->program_counter + 1];
 	state->program_counter += 2;
 
-	//printf("instruction: 0x%x\n", instruction);
+	//printf("instruction: 0x%04x\n", instruction);
+
+	// Extract common parts of instruction here so we don't make mistakes later.
+	// O (opcode): O___
+        // X: _X__
+        // Y: __Y_
+	// NNN: _NNN
+	// NN: __NN
+	// N: ___N
+	uint8_t op = instruction >> 12;
+	uint8_t x = (instruction & 0x0F00) >> 8;
+	uint8_t y = (instruction & 0x00F0) >> 4;
+	uint16_t nnn = instruction & 0x0FFF;
+	uint8_t nn = instruction & 0x00FF;
+	uint8_t n = instruction & 0x000F;
 
 	// First byte of instruction stores op code
-	switch (instruction & 0xF000) {
-	case 0x0000:
+	switch (op) {
+	case 0x0:
 		switch (instruction & 0x0FFF) {
 		case 0x00E0: // Clear screen
 			for (int i = 0; i < DISPLAY_WIDTH; i++) {
@@ -189,10 +203,10 @@ void processor_cycle(chip8_state *state)
 			exit_unknown_instruction(instruction, state->program_counter);
 		}
 		break;
-        case 0x1000: // Jump (0x1NNN) NNN is the new program counter
-		state->program_counter = instruction & 0x0FFF;
+        case 0x1: // Jump (0x1NNN) NNN is the new program counter
+		state->program_counter = nnn;
 		break;
-        case 0x2000: // Subroutine call (0x1NNN) at location NNN
+        case 0x2: // Subroutine call (0x1NNN) at location NNN
 		// Add old PC to stack
 		if (state->stack_ptr == MAX_STACK_SIZE) {
 			fprintf(stderr, "stack overflow! instruction: %d (PC: %d)\n", instruction, state->program_counter);
@@ -202,44 +216,43 @@ void processor_cycle(chip8_state *state)
 		state->program_counter++;
 
 		// Jump to NNN
-		state->program_counter = instruction & 0x0FFF;
+		state->program_counter = nnn;
 		break;
-	case 0x6000: // 0x6XNN: Set register VX to NN
-		state->V[(uint8_t) ((instruction & 0x0F00) >> 8)] = (uint8_t) (instruction & 0x00FF);
+	case 0x6: // 0x6XNN: Set register VX to NN
+		state->V[x] = nn;
 		break;
-	case 0x7000: // 0x7XNN: Add NN to register VX
-		state->V[(uint8_t) ((instruction & 0x0F00) >> 8)] += (uint8_t) (instruction & 0x00FF);
+	case 0x7: // 0x7XNN: Add NN to register VX
+		state->V[x] += nn;
 		break;
-	case 0xA000: // 0xANNN: Set index register to NNN
-		state->index_register = instruction & 0x0FFF;
+	case 0xA: // 0xANNN: Set index register to NNN
+		state->index_register = nnn;
 		break;
-	case 0xD000: ;// 0xDXYN: Display
+	case 0xD: ;// 0xDXYN: Display
 		/* Display n-byte sprite starting at memory location I
 		 * at (Vx, Vy), set VF = collision. */
 
-		uint8_t x = state->V[(instruction & 0x0F00) >> 8] % DISPLAY_WIDTH;
-		uint8_t y = state->V[(instruction & 0x00F0) >> 4] % DISPLAY_HEIGHT;
-		uint8_t n = instruction & 0x000F;
+		uint8_t vx = state->V[x] % DISPLAY_WIDTH;
+		uint8_t vy = state->V[y] % DISPLAY_HEIGHT;
 
 		// Reset collision flag
 		state->V[0xF] = 0;
 
 		// Read n bytes from memory. j is the y value
-		for (uint8_t j = 0; j < n && y + j < DISPLAY_HEIGHT; j++) {
+		for (uint8_t j = 0; j < n && vy + j < DISPLAY_HEIGHT; j++) {
 			uint8_t sprite_row = state->mem[state->index_register + j];
 
 			// i is the x value we use to iterate over bits
-			for (uint8_t i = 0; i < 8 && x + i < DISPLAY_WIDTH; i++) {
+			for (uint8_t i = 0; i < 8 && vx + i < DISPLAY_WIDTH; i++) {
 				// Bit shift to get the current row bit
 				uint8_t sprite_bit = (sprite_row >> (7 - i)) & 1;
 
-				if (state->display[x+i][y+j] == 1 && sprite_bit == 1) {
+				if (state->display[vx+i][vy+j] == 1 && sprite_bit == 1) {
 					// Set collision register
 					state->V[0xF] = 1;
 				}
 
 				// XOR with the current bit
-				state->display[x+i][y+j] ^= sprite_bit;
+				state->display[vx+i][vy+j] ^= sprite_bit;
 			}
 		}
 		break;
