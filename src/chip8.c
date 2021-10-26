@@ -19,6 +19,9 @@ typedef struct {
 	bool display[DISPLAY_WIDTH][DISPLAY_HEIGHT];
 	uint16_t program_counter;
 	uint16_t index_register;
+
+	/* Stack is for subroutines */
+	uint8_t stack_ptr; // Points to element after top of stack (starts at 0 when stack empty)
 	uint16_t stack[MAX_STACK_SIZE];
 
 	/* Timers decremented at 60 Hz */
@@ -35,6 +38,7 @@ void init_state(chip8_state *state)
 	state->program_counter = 0x200;
 	memset(state->display, 0, sizeof(state->display));
 	memset(state->V, 0, sizeof(state->V));
+	state->stack_ptr = 0;
 }
 
 typedef struct {
@@ -174,12 +178,30 @@ void processor_cycle(chip8_state *state)
 			break;
 
 		case 0x000E: // Return from subroutine
+			if (state->stack_ptr == 0) {
+				fprintf(stderr, "internal error: pop from empty stack! instruction: %d (PC: %d)\n", instruction, state->program_counter);
+				exit(EXIT_FAILURE);
+			}
+			state->program_counter = state->stack[state->stack_ptr - 1];
+			state->program_counter--;
 			break;
 		default:
 			exit_unknown_instruction(instruction, state->program_counter);
 		}
 		break;
         case 0x1000: // Jump (0x1NNN) NNN is the new program counter
+		state->program_counter = instruction & 0x0FFF;
+		break;
+        case 0x2000: // Subroutine call (0x1NNN) at location NNN
+		// Add old PC to stack
+		if (state->stack_ptr == MAX_STACK_SIZE) {
+			fprintf(stderr, "stack overflow! instruction: %d (PC: %d)\n", instruction, state->program_counter);
+			exit(EXIT_FAILURE);
+		}
+		state->stack[state->stack_ptr] = state->program_counter;
+		state->program_counter++;
+
+		// Jump to NNN
 		state->program_counter = instruction & 0x0FFF;
 		break;
 	case 0x6000: // 0x6XNN: Set register VX to NN
