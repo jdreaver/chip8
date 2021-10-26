@@ -146,6 +146,12 @@ void process_sdl_events(SDL_Window *window)
 	}
 }
 
+void exit_unknown_instruction(uint16_t instruction, uint16_t program_counter)
+{
+	fprintf(stderr, "Unknown instruction: 0x%x (PC: 0x%x)\n", instruction, program_counter);
+	exit(EXIT_FAILURE);
+}
+
 void processor_cycle(chip8_state *state)
 {
 	// Instructions are 2 bytes
@@ -158,7 +164,7 @@ void processor_cycle(chip8_state *state)
 	switch (instruction & 0xF000) {
 	case 0x0000:
 		switch (instruction & 0x0FFF) {
-		case 0x0E0: // Clear screen
+		case 0x00E0: // Clear screen
 			for (int i = 0; i < DISPLAY_WIDTH; i++) {
 				for (int j = 0; j < DISPLAY_HEIGHT; j++) {
 					state->display[i][j] = 0;
@@ -167,11 +173,11 @@ void processor_cycle(chip8_state *state)
 			// TODO: Set some bit here that says display was touched
 			break;
 
-		case 0x00E: // Return from subroutine
+		case 0x000E: // Return from subroutine
 			break;
+		default:
+			exit_unknown_instruction(instruction, state->program_counter);
 		}
-
-		// TODO: Log unknown instruction
 		break;
         case 0x1000: // Jump (0x1NNN) NNN is the new program counter
 		state->program_counter = instruction & 0x0FFF;
@@ -216,8 +222,7 @@ void processor_cycle(chip8_state *state)
 		}
 		break;
 	default:
-		fprintf(stderr, "Unknown instruction: 0x%x (PC: 0x%x)\n", instruction, state->program_counter);
-		exit(EXIT_FAILURE);
+		exit_unknown_instruction(instruction, state->program_counter);
 	}
 }
 
