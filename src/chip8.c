@@ -169,10 +169,10 @@ void processor_cycle(chip8_state *state)
 		state->program_counter = instruction & 0x0FFF;
 		break;
 	case 0x6000: // 0x6XNN: Set register VX to NN
-		state->V[(uint8_t) (instruction & 0x0F00)] = (uint8_t) (instruction & 0x00FF);
+		state->V[(uint8_t) ((instruction & 0x0F00) >> 8)] = (uint8_t) (instruction & 0x00FF);
 		break;
 	case 0x7000: // 0x7XNN: Add NN to register VX
-		state->V[(uint8_t) (instruction & 0x0F00)] += (uint8_t) (instruction & 0x00FF);
+		state->V[(uint8_t) ((instruction & 0x0F00) >> 8)] += (uint8_t) (instruction & 0x00FF);
 		break;
 	case 0xA000: // 0xANNN: Set index register to NNN
 		state->index_register = instruction & 0x0FFF;
