@@ -7,8 +7,8 @@
 
 #define PIXEL_SCALE_FACTOR 8
 
-#define DISPLAY_HEIGHT 64
-#define DISPLAY_WIDTH 32
+#define DISPLAY_WIDTH 64
+#define DISPLAY_HEIGHT 32
 
 #define MAX_STACK_SIZE 100
 
@@ -16,7 +16,7 @@
 
 typedef struct {
 	uint8_t mem[4096];
-	bool display[DISPLAY_HEIGHT][DISPLAY_WIDTH];
+	bool display[DISPLAY_WIDTH][DISPLAY_HEIGHT];
 	uint16_t program_counter;
 	uint16_t index_register;
 	uint16_t stack[MAX_STACK_SIZE];
@@ -46,8 +46,8 @@ void init_screen(chip8_screen *screen)
 {
 	SDL_Init(SDL_INIT_VIDEO);
 
-	int window_width = DISPLAY_HEIGHT * PIXEL_SCALE_FACTOR;
-	int window_height = DISPLAY_WIDTH * PIXEL_SCALE_FACTOR;
+	int window_width = DISPLAY_WIDTH * PIXEL_SCALE_FACTOR;
+	int window_height = DISPLAY_HEIGHT * PIXEL_SCALE_FACTOR;
 	screen->window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, 0);
 	screen->renderer = SDL_CreateRenderer(screen->window, -1, SDL_RENDERER_ACCELERATED);
 }
@@ -71,7 +71,7 @@ uint8_t font[] = {
 	0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 };
 
-void draw_display(chip8_screen *screen, bool display[DISPLAY_HEIGHT][DISPLAY_WIDTH])
+void draw_display(chip8_screen *screen, bool display[DISPLAY_WIDTH][DISPLAY_HEIGHT])
 {
 	// Clear screen to black
 	SDL_SetRenderDrawColor(screen->renderer, 0, 0, 0, 255);
@@ -151,8 +151,8 @@ void processor_cycle(chip8_state *state)
 	case 0x0000:
 		switch (instruction & 0x0FFF) {
 		case 0x0E0: // Clear screen
-			for (int i = 0; i < DISPLAY_HEIGHT; i++) {
-				for (int j = 0; j < DISPLAY_WIDTH; j++) {
+			for (int i = 0; i < DISPLAY_WIDTH; i++) {
+				for (int j = 0; j < DISPLAY_HEIGHT; j++) {
 					state->display[i][j] = 0;
 				}
 			}
@@ -177,9 +177,38 @@ void processor_cycle(chip8_state *state)
 	case 0xA000: // 0xANNN: Set index register to NNN
 		state->index_register = instruction & 0x0FFF;
 		break;
-	case 0xD000: // 0xDXYN: Display
-		/* TODO */
-		printf("Would display: 0x%x (PC: 0x%x)\n", instruction, state->program_counter);
+	case 0xD000: ;// 0xDXYN: Display
+		/* Display n-byte sprite starting at memory location I
+		 * at (Vx, Vy), set VF = collision. */
+		printf("Display 0x%x, %d, %d, %d\n", instruction, (instruction & 0x0F00) >> 8, (instruction & 0x00F0) >> 4, instruction & 0x000F);
+
+		uint8_t x = state->V[(instruction & 0x0F00) >> 8] % DISPLAY_WIDTH;
+		uint8_t y = state->V[(instruction & 0x00F0) >> 4] % DISPLAY_HEIGHT;
+		uint8_t n = instruction & 0x000F;
+
+		// Reset collision flag
+		state->V[0xF] = 0;
+
+		// Read n bytes from memory. j is the y value
+		for (uint8_t j = 0; j < n && y + j < DISPLAY_HEIGHT; j++) {
+			uint8_t sprite_row = state->mem[state->index_register + j];
+			printf("x = %d, y = %d, j = %d, sprite_row = 0x%x\n", x, y, j, sprite_row);
+
+			// i is the x value we use to iterate over bits
+			for (uint8_t i = 0; i < 8 && x + i < DISPLAY_WIDTH; i++) {
+				// Bit shift to get the current row bit
+				uint8_t sprite_bit = (sprite_row >> (7 - i)) && 1;
+
+				if (state->display[x+i][y+j] == 1 && sprite_bit == 1) {
+					// Set collision register
+					state->V[0xF] = 1;
+				}
+
+				// XOR with the current bit
+				state->display[x+i][y+j] ^= sprite_bit;
+				printf("display[%d][%d] = %d\n", x+i, y+j, state->display[x+i][y+j]);
+			}
+		}
 		break;
 	default:
 		printf("Unknown instruction: 0x%x (PC: 0x%x)\n", instruction, state->program_counter);
@@ -202,14 +231,15 @@ int main(int argc, char *argv[])
 	// Load ROM into memory
 	load_rom(argv[1], state.mem);
 
-	// Draw simple rectangle for testing
-	state.display[32][16] = 1;
-	draw_display(&screen, state.display);
-
 	while (true) {
 		process_sdl_events(screen.window);
 
 		processor_cycle(&state);
+
+		// TODO: Only draw display when display is updated
+		// (set a bit on instructions in processor_cycle that
+		// update the screen)
+		draw_display(&screen, state.display);
 
 		// TODO: Perform more accurate clock speed emulation
 		// by using clock_gettime(CLOCK_MONOTONIC, ...),
