@@ -249,35 +249,54 @@ void processor_cycle(chip8_state *state)
 		break;
 	case 0x8:
 		switch (n) {
-		case 0: // 0x8XY0: Set VX to VY
+		case 0x0: // 0x8XY0: Set VX to VY
 			state->V[x] = state->V[y];
 			break;
-		case 1: // 0x8XY1: Set VX to VX | VY
+		case 0x1: // 0x8XY1: Set VX to VX | VY
 			state->V[x] |= state->V[y];
 			break;
-		case 2: // 0x8XY2: Set VX to VX & VY
+		case 0x2: // 0x8XY2: Set VX to VX & VY
 			state->V[x] &= state->V[y];
 			break;
-		case 3: // 0x8XY3: Set VX to VX XOR VY
+		case 0x3: // 0x8XY3: Set VX to VX XOR VY
 			state->V[x] ^= state->V[y];
 			break;
-		case 4: // 0x8XY4: Set VX to VX + VY, accounting for carry
+		case 0x4: // 0x8XY4: Set VX to VX + VY, accounting for carry
 			// If the sum of vx and vx is less than one of
 			// the operands (we pick vx arbitrarily), then
 			// we saw overflow.
-			state->V[0xF] = ((state->V[x] + state->V[y]) < state->V[x]) ? 1 : 0;
+			state->V[0xF] = (state->V[x] + state->V[y]) < state->V[x];
 			state->V[x] += state->V[y];
 			break;
-		case 5: // 0x8XY5: Set VX to VX +-VY, accounting for carry
-			// TODO
-			printf("TODO\n");
+		case 0x5: // 0x8XY5: Set VX to VX - VY, accounting for carry
+			state->V[0xF] = state->V[x] > state->V[y];
+			state->V[x] = state->V[x] - state->V[y];
 			break;
+		case 0x6: // 0x8XY6: Store least significant bit of VX in VF and shift VX right by 1
+			state->V[0xF] = state->V[x] & 0x1;
+			state->V[x] >>= 1;
+			break;
+		case 0x7: // 0x8XY7: Set VX to VY - VX, accounting for carry
+			state->V[0xF] = state->V[y] > state->V[x];
+			state->V[x] = state->V[y] - state->V[x];
+			break;
+		case 0xE: // 0x8XYE: Store most significant bit of VX in VF and shift VX left by 1
+			state->V[0xF] = (state->V[x] >> 7) & 0x1;
+			state->V[x] <<= 1;
+			break;
+
 		default:
 			exit_unknown_instruction(instruction, state->program_counter);
 		}
 		break;
 	case 0xA: // 0xANNN: Set index register to NNN
 		state->index_register = nnn;
+		break;
+	case 0xB: // 0xBNNN: Jump to VX + NNN
+		state->program_counter = state->V[x] + nnn;
+		break;
+	case 0xC: // 0xCXNN: Set VX to a random number AND'ed with NN
+		state->V[x] = rand() & nn;
 		break;
 	case 0xD: ;// 0xDXYN: Display
 		/* Display n-byte sprite starting at memory location I
