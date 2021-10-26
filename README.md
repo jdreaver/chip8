@@ -1,4 +1,8 @@
-# Chip 8 Emulator
+# CHIP-8 Emulator
+
+This is my code for a [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8)
+emulator. Don't expect much. I'll probably complete this and then
+abandon it, but it is a fun C project.
 
 ## Resources
 
@@ -10,8 +14,8 @@
 
 ## TODO
 
+- Add tests, just to practice testing C code.
 - Terminal graphics instead of SDL
   - Make this an option?
-- Move stack to the end of memory, don't use a separate array
 - Move a lot of the #defines into chip8_state and make them configurable
 - More accurate simulated clock speed
