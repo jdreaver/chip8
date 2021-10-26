@@ -116,6 +116,12 @@ void load_rom(char* filename, uint8_t mem[4096])
 
 	if (bytes_read != fsize) {
 		fprintf(stderr, "failed loading ROM into memory. %ld != %ld\n", bytes_read, fsize);
+		if (feof(fp)) {
+			fprintf(stderr, "ROM file hit EOF\n");
+		}
+		if (ferror(fp)) {
+			fprintf(stderr, "ROM file had an error\n");
+		}
 		exit(EXIT_FAILURE);
 	}
 
@@ -145,6 +151,8 @@ void processor_cycle(chip8_state *state)
 	// Instructions are 2 bytes
 	uint16_t instruction = state->mem[state->program_counter] << 8 | state->mem[state->program_counter + 1];
 	state->program_counter += 2;
+
+	//printf("instruction: 0x%x\n", instruction);
 
 	// First byte of instruction stores op code
 	switch (instruction & 0xF000) {
@@ -180,7 +188,6 @@ void processor_cycle(chip8_state *state)
 	case 0xD000: ;// 0xDXYN: Display
 		/* Display n-byte sprite starting at memory location I
 		 * at (Vx, Vy), set VF = collision. */
-		printf("Display 0x%x, %d, %d, %d\n", instruction, (instruction & 0x0F00) >> 8, (instruction & 0x00F0) >> 4, instruction & 0x000F);
 
 		uint8_t x = state->V[(instruction & 0x0F00) >> 8] % DISPLAY_WIDTH;
 		uint8_t y = state->V[(instruction & 0x00F0) >> 4] % DISPLAY_HEIGHT;
@@ -192,7 +199,6 @@ void processor_cycle(chip8_state *state)
 		// Read n bytes from memory. j is the y value
 		for (uint8_t j = 0; j < n && y + j < DISPLAY_HEIGHT; j++) {
 			uint8_t sprite_row = state->mem[state->index_register + j];
-			// printf("x = %d, y = %d, j = %d, sprite_row = 0x%x\n", x, y, j, sprite_row);
 
 			// i is the x value we use to iterate over bits
 			for (uint8_t i = 0; i < 8 && x + i < DISPLAY_WIDTH; i++) {
@@ -206,12 +212,12 @@ void processor_cycle(chip8_state *state)
 
 				// XOR with the current bit
 				state->display[x+i][y+j] ^= sprite_bit;
-				printf("sprite_bit = %d, display[%d][%d] = %d\n", sprite_bit, x+i, y+j, state->display[x+i][y+j]);
 			}
 		}
 		break;
 	default:
-		printf("Unknown instruction: 0x%x (PC: 0x%x)\n", instruction, state->program_counter);
+		fprintf(stderr, "Unknown instruction: 0x%x (PC: 0x%x)\n", instruction, state->program_counter);
+		exit(EXIT_FAILURE);
 	}
 }
 
