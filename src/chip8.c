@@ -80,8 +80,8 @@ void draw_display(chip8_screen *screen, bool display[DISPLAY_WIDTH][DISPLAY_HEIG
 	// Set drawing color to white
 	SDL_SetRenderDrawColor(screen->renderer, 255, 255, 255, 255);
 
-	for (int i = 0; i < DISPLAY_HEIGHT; i++) {
-		for (int j = 0; j < DISPLAY_WIDTH; j++) {
+	for (int i = 0; i < DISPLAY_WIDTH; i++) {
+		for (int j = 0; j < DISPLAY_HEIGHT; j++) {
 			if (display[i][j]) {
 				SDL_Rect rect = {
 					.x = i * PIXEL_SCALE_FACTOR,
@@ -192,7 +192,7 @@ void processor_cycle(chip8_state *state)
 		// Read n bytes from memory. j is the y value
 		for (uint8_t j = 0; j < n && y + j < DISPLAY_HEIGHT; j++) {
 			uint8_t sprite_row = state->mem[state->index_register + j];
-			printf("x = %d, y = %d, j = %d, sprite_row = 0x%x\n", x, y, j, sprite_row);
+			// printf("x = %d, y = %d, j = %d, sprite_row = 0x%x\n", x, y, j, sprite_row);
 
 			// i is the x value we use to iterate over bits
 			for (uint8_t i = 0; i < 8 && x + i < DISPLAY_WIDTH; i++) {
@@ -206,7 +206,7 @@ void processor_cycle(chip8_state *state)
 
 				// XOR with the current bit
 				state->display[x+i][y+j] ^= sprite_bit;
-				printf("display[%d][%d] = %d\n", x+i, y+j, state->display[x+i][y+j]);
+				printf("sprite_bit = %d, display[%d][%d] = %d\n", sprite_bit, x+i, y+j, state->display[x+i][y+j]);
 			}
 		}
 		break;
