@@ -139,8 +139,21 @@ void load_rom(char* filename, uint8_t mem[4096])
 	memcpy(mem + FONT_MEMORY_START, font, sizeof(font));
 }
 
-void process_sdl_events(SDL_Window *window)
+// Keyboard looks like this:
+// 1 2 3 4
+// Q W E R
+// A S D F
+// Z X C V
+SDL_Scancode keymappings[16] = {
+    SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4,
+    SDL_SCANCODE_Q, SDL_SCANCODE_W, SDL_SCANCODE_E, SDL_SCANCODE_R,
+    SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_F,
+    SDL_SCANCODE_Z, SDL_SCANCODE_X, SDL_SCANCODE_C, SDL_SCANCODE_V};
+
+
+void process_sdl_events(SDL_Window *window, chip8_state *state)
 {
+	const Uint8* sdl_state = SDL_GetKeyboardState(NULL);
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		switch (event.type) {
@@ -149,6 +162,16 @@ void process_sdl_events(SDL_Window *window)
 			SDL_Quit();
 			exit(EXIT_SUCCESS);
 		default:
+			if (sdl_state[SDL_SCANCODE_ESCAPE]) {
+				// TODO: DRY this with above
+				SDL_DestroyWindow(window);
+				SDL_Quit();
+				exit(EXIT_SUCCESS);
+			}
+
+			for (int i = 0; i <= 0xF; i++) {
+				state->keys_pressed[i] = sdl_state[keymappings[i]];
+			}
 			break;
 		}
 	}
@@ -422,7 +445,7 @@ int main(int argc, char *argv[])
 	load_rom(argv[1], state.mem);
 
 	while (true) {
-		process_sdl_events(screen.window);
+		process_sdl_events(screen.window, &state);
 
 		processor_cycle(&state);
 
