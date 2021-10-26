@@ -152,7 +152,7 @@ void process_sdl_events(SDL_Window *window)
 
 void exit_unknown_instruction(uint16_t instruction, uint16_t program_counter)
 {
-	fprintf(stderr, "Unknown instruction: 0x%x (PC: 0x%x)\n", instruction, program_counter);
+	fprintf(stderr, "Unknown instruction: 0x%04x (PC: 0x%x)\n", instruction, program_counter);
 	exit(EXIT_FAILURE);
 }
 
@@ -191,13 +191,13 @@ void processor_cycle(chip8_state *state)
 			// TODO: Set some bit here that says display was touched
 			break;
 
-		case 0x000E: // Return from subroutine
+		case 0x00EE: // Return from subroutine
 			if (state->stack_ptr == 0) {
 				fprintf(stderr, "internal error: pop from empty stack! instruction: %d (PC: %d)\n", instruction, state->program_counter);
 				exit(EXIT_FAILURE);
 			}
 			state->program_counter = state->stack[state->stack_ptr - 1];
-			state->program_counter--;
+			state->stack_ptr--;
 			break;
 		default:
 			exit_unknown_instruction(instruction, state->program_counter);
@@ -206,18 +206,41 @@ void processor_cycle(chip8_state *state)
         case 0x1: // Jump (0x1NNN) NNN is the new program counter
 		state->program_counter = nnn;
 		break;
-        case 0x2: // Subroutine call (0x1NNN) at location NNN
+        case 0x2: // Subroutine call (0x2NNN) at location NNN
 		// Add old PC to stack
 		if (state->stack_ptr == MAX_STACK_SIZE) {
 			fprintf(stderr, "stack overflow! instruction: %d (PC: %d)\n", instruction, state->program_counter);
 			exit(EXIT_FAILURE);
 		}
 		state->stack[state->stack_ptr] = state->program_counter;
-		state->program_counter++;
+		state->stack_ptr++;
 
 		// Jump to NNN
 		state->program_counter = nnn;
 		break;
+
+	// All of the skip routines (including 9XY0, which is included here out of order)
+	case 0x3: // 0x3XNN, skip if VX == NN
+		if (state->V[x] == nn) {
+			state->program_counter += 2;
+		}
+		break;
+	case 0x4: // 0x4XNN, skip if VX != NN
+		if (state->V[x] != nn) {
+			state->program_counter += 2;
+		}
+		break;
+	case 0x5: // 0x5XY0, skip if VX == VY
+		if (state->V[x] == state->V[y]) {
+			state->program_counter += 2;
+		}
+		break;
+	case 0x9: // 0x9XY0, skip if VX != VY
+		if (state->V[x] != state->V[y]) {
+			state->program_counter += 2;
+		}
+		break;
+
 	case 0x6: // 0x6XNN: Set register VX to NN
 		state->V[x] = nn;
 		break;
@@ -231,28 +254,28 @@ void processor_cycle(chip8_state *state)
 		/* Display n-byte sprite starting at memory location I
 		 * at (Vx, Vy), set VF = collision. */
 
-		uint8_t vx = state->V[x] % DISPLAY_WIDTH;
-		uint8_t vy = state->V[y] % DISPLAY_HEIGHT;
+		uint8_t dx = state->V[x] % DISPLAY_WIDTH;
+		uint8_t dy = state->V[y] % DISPLAY_HEIGHT;
 
 		// Reset collision flag
 		state->V[0xF] = 0;
 
 		// Read n bytes from memory. j is the y value
-		for (uint8_t j = 0; j < n && vy + j < DISPLAY_HEIGHT; j++) {
+		for (uint8_t j = 0; j < n && dy + j < DISPLAY_HEIGHT; j++) {
 			uint8_t sprite_row = state->mem[state->index_register + j];
 
 			// i is the x value we use to iterate over bits
-			for (uint8_t i = 0; i < 8 && vx + i < DISPLAY_WIDTH; i++) {
+			for (uint8_t i = 0; i < 8 && dx + i < DISPLAY_WIDTH; i++) {
 				// Bit shift to get the current row bit
 				uint8_t sprite_bit = (sprite_row >> (7 - i)) & 1;
 
-				if (state->display[vx+i][vy+j] == 1 && sprite_bit == 1) {
+				if (state->display[dx+i][dy+j] == 1 && sprite_bit == 1) {
 					// Set collision register
 					state->V[0xF] = 1;
 				}
 
 				// XOR with the current bit
-				state->display[vx+i][vy+j] ^= sprite_bit;
+				state->display[dx+i][dy+j] ^= sprite_bit;
 			}
 		}
 		break;
