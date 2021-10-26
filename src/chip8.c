@@ -197,7 +197,7 @@ void processor_cycle(chip8_state *state)
 			// i is the x value we use to iterate over bits
 			for (uint8_t i = 0; i < 8 && x + i < DISPLAY_WIDTH; i++) {
 				// Bit shift to get the current row bit
-				uint8_t sprite_bit = (sprite_row >> (7 - i)) && 1;
+				uint8_t sprite_bit = (sprite_row >> (7 - i)) & 1;
 
 				if (state->display[x+i][y+j] == 1 && sprite_bit == 1) {
 					// Set collision register
