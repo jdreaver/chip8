@@ -30,6 +30,8 @@ typedef struct {
 
 	/* General purpose registers */
 	uint8_t V[16];
+
+	bool keys_pressed[16];
 } chip8_state;
 
 void init_state(chip8_state *state)
@@ -55,6 +57,8 @@ void init_screen(chip8_screen *screen)
 	screen->window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, 0);
 	screen->renderer = SDL_CreateRenderer(screen->window, -1, SDL_RENDERER_ACCELERATED);
 }
+
+#define FONT_MEMORY_START 0x050
 
 uint8_t font[] = {
 	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -132,7 +136,7 @@ void load_rom(char* filename, uint8_t mem[4096])
 	fclose(fp);
 
         // Load font into 0x050–0x09F
-	memcpy(mem + 0x050, font, sizeof(font));
+	memcpy(mem + FONT_MEMORY_START, font, sizeof(font));
 }
 
 void process_sdl_events(SDL_Window *window)
@@ -325,6 +329,75 @@ void processor_cycle(chip8_state *state)
 				// XOR with the current bit
 				state->display[dx+i][dy+j] ^= sprite_bit;
 			}
+		}
+		break;
+	case 0xE:
+		switch (nn) {
+		case 0x9E: // 0xEX9E: skip instruction if key VX is being pressed
+			if (state->keys_pressed[state->V[x]] == 1) {
+				state->program_counter += 2;
+			}
+			break;
+		case 0xA1: // 0xEXA1: skip instruction if key VX is not being pressed
+			if (state->keys_pressed[state->V[x]] == 0) {
+				state->program_counter += 2;
+			}
+			break;
+		default:
+			exit_unknown_instruction(instruction, state->program_counter);
+		}
+		break;
+
+	case 0xF:
+		switch (nn) {
+		case 0x07: // 0xFX07: set VX to the current value of the delay timer
+			state->V[x] = state->delay_timer;
+			break;
+		case 0x15: // 0xFX15: set the delay timer to the value in VX
+			state->delay_timer = state->V[x];
+			break;
+		case 0x18: // 0xFX18: set the sound timer to the value in VX
+			state->sound_timer = state->V[x];
+			break;
+		case 0x1E: // 0xFX1E: Add VX to I
+			// Overflow behavior is non-standard, but assumed safe
+			state->V[0xF] = (state->V[x] + state->index_register) < state->V[x];
+			state->index_register += state->V[x];
+			break;
+		case 0x0A: ;// 0xFX0A: Block until any key is pressed, put key in VX
+			// Decrement program counter to repeat this
+			// instruction in case a key isn't pressed
+			state->program_counter -= 2;
+
+			for (int i = 0; i <= 0xF; i++) {
+				if (state->keys_pressed[i] == 1) {
+					state->V[x] = i;
+					state->program_counter += 2;
+					break;
+				}
+			}
+			break;
+		case 0x29: ;// 0xFX29: Set I to font character in VX
+			// Fonts are 5 bytes wide
+			state->index_register = FONT_MEMORY_START + state->V[x] * 5;
+			break;
+		case 0x33: ;// 0xFX33: Store 3 decimal digits of VX in I, I+1, I+2
+			state->mem[state->index_register]     = (state->V[x] % 1000) / 100;
+			state->mem[state->index_register + 1] = (state->V[x] % 100) / 10;
+			state->mem[state->index_register + 2] = (state->V[x] % 10);
+			break;
+		case 0x55: // 0xFX55: Store all registers from V0 to VX in I, I+1, I+2, ... I+X
+			for (int i = 0; i <= x; i++) {
+				state->mem[state->index_register + i] = state->V[i];
+			}
+			break;
+		case 0x65: // 0xFX65: Store all memory from I, I+1, I+2, ... I+X in registers V0 to VX
+			for (int i = 0; i <= x; i++) {
+				state->V[i] = state->mem[state->index_register + i];
+			}
+			break;
+		default:
+			exit_unknown_instruction(instruction, state->program_counter);
 		}
 		break;
 	default:
