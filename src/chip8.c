@@ -112,7 +112,7 @@ void load_rom(char* filename, uint8_t mem[4096])
 	size_t fsize = st.st_size;
 
 	// Memory up to 0x200 is reserved for internal use
-	size_t bytes_read = fread(mem + 0x200, 1, sizeof(uint8_t*) * 4096 - 0x200, fp);
+	size_t bytes_read = fread(mem + 0x200, 1, 4096 - 0x200, fp);
 
 	if (bytes_read != fsize) {
 		fprintf(stderr, "failed loading ROM into memory. %ld != %ld\n", bytes_read, fsize);
