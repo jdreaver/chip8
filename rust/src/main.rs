@@ -15,7 +15,11 @@ fn main() {
 
     let rom_path = Path::new(&args[0]);
     let mut vm = VM::new();
-    load_rom_file(&mut vm, &rom_path).expect("failed to load rom");
+
+    if let Err(err) = load_rom_file(&mut vm, &rom_path) {
+        eprintln!("Error loading ROM file {}: {}", &rom_path.display(), err);
+        std::process::exit(1);
+    }
 
     println!("Loaded ROM file {}", rom_path.display());
     println!("First 8 bytes: {:#04X?}", &vm.memory[0x200..(0x200 + 8)]);
