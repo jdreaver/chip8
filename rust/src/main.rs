@@ -31,9 +31,9 @@ struct VM {
 
 impl VM {
     fn new() -> VM {
-	VM {
-	    memory: [0; MEMORY_BYTES],
-	}
+        VM {
+            memory: [0; MEMORY_BYTES],
+        }
     }
 }
 
