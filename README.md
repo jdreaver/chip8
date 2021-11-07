@@ -2,7 +2,19 @@
 
 This is my code for a [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8)
 emulator. Don't expect much. I'll probably complete this and then
-abandon it, but it is a fun C project.
+abandon it, but it is a fun systems project.
+
+## Running
+
+### C Version
+
+```sh
+$ cd c/
+$ make
+$ ./bin/chip8 ../roms/ibm-logo.ch8
+```
+
+### Rust Version
 
 ## Resources
 
@@ -14,7 +26,7 @@ abandon it, but it is a fun C project.
 
 ## TODO
 
-- Add tests, just to practice testing C code.
+- Add tests for C, just to practice testing C code.
 - Terminal graphics instead of SDL
   - Make this an option?
 - Move a lot of the #defines into chip8_state and make them configurable
