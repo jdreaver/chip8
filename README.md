@@ -16,6 +16,11 @@ $ ./bin/chip8 ../roms/ibm-logo.ch8
 
 ### Rust Version
 
+```sh
+$ cd rust/
+$ cargo run -- ../roms/ibm-logo.ch8
+```
+
 ## Resources
 
 - https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
