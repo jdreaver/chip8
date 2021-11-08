@@ -2,7 +2,8 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    pkgs.cargo
-    pkgs.rustc
+    cargo
+    rustc
+    SDL2
   ];
 }
