@@ -67,11 +67,17 @@ struct VM {
     ir: u16,
 
     // Stack is for subroutines
-    sp: u8, // Points to element after top of stack (starts at 0 when stack empty)
+    sp: usize, // Points to element after top of stack (starts at 0 when stack empty)
     stack: [u16; MAX_STACK_SIZE],
 
     // General purpose registers
     v: [u8; 16],
+
+    keys_pressed: [bool; 16],
+
+    // Timers decremented at 60 Hz
+    delay_timer: u8,
+    sound_timer: u8,
 }
 
 impl VM {
@@ -84,15 +90,42 @@ impl VM {
             sp: 0,
             stack: [0; MAX_STACK_SIZE],
             v: [0; 16],
+            keys_pressed: [false; 16],
+	    delay_timer: 0,
+	    sound_timer: 0,
         }
     }
 }
+
+const FONT_MEMORY_START: usize = 0x050;
+
+const FONT_BYTES: [u8; 80] = [
+	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+	0x20, 0x60, 0x20, 0x20, 0x70, // 1
+	0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+	0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+	0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+	0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+	0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+	0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+	0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+	0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+	0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+	0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+	0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+	0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+	0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+	0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+];
 
 fn load_rom_file(vm: &mut VM, path: &Path) -> io::Result<()> {
     let mut f = File::open(path)?;
 
     // Rom memory starts at 0x200
     f.read(&mut vm.memory[0x200..])?;
+
+    // Load font into 0x050–0x09F
+    vm.memory[0x050..=0x09F].copy_from_slice(&FONT_BYTES);
 
     Ok(())
 }
@@ -101,9 +134,6 @@ fn processor_cycle(vm: &mut VM) {
     // Instructions are two bytes
     let instruction: u16 =
         (vm.memory[vm.pc as usize] as u16) << 8 | vm.memory[vm.pc as usize + 1] as u16;
-
-    // Increment program counter here so we don't forget later
-    vm.pc += 2;
 
     // TODO: Parse instructions into an enum, and then process them in
     // a second stage.
@@ -123,25 +153,125 @@ fn processor_cycle(vm: &mut VM) {
     let n: u8 = (instruction & 0x000F) as u8;
 
     match op {
-        0x0 => match nnn {
-            0x00E0 => {
+        0x0 => {
+            match nnn {
                 // Clear screen
-                for i in 0..DISPLAY_WIDTH_PX {
-                    for j in 0..DISPLAY_HEIGHT_PX {
-                        vm.display[i][j] = false;
+                0x00E0 => {
+                    for i in 0..DISPLAY_WIDTH_PX {
+                        for j in 0..DISPLAY_HEIGHT_PX {
+                            vm.display[i][j] = false;
+                        }
                     }
                 }
+                // Return from subroutine
+                0x00EE => {
+                    if vm.sp == 0 {
+                        eprintln!("internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})", instruction, vm.pc);
+                        std::process::exit(1);
+                    }
+                    vm.pc = vm.stack[vm.sp];
+                    vm.sp -= 1;
+                }
+                _ => exit_unknown_instruction(instruction, vm.pc),
             }
-            _ => exit_unknown_instruction(instruction, vm.pc),
-        },
+        }
         // 0x1NNN: Jump to NNN
         0x1 => vm.pc = nnn,
+        // Subroutine call (0x2NNN) at location NNN
+        0x2 => {
+            // Add old PC to stack
+            if vm.sp == MAX_STACK_SIZE {
+                eprintln!(
+                    "stack overflow! instruction {:#04X?} (PC: {:#04X?})",
+                    instruction, vm.pc
+                );
+                std::process::exit(1);
+            }
+            vm.stack[vm.sp] = vm.pc;
+            vm.sp += 1;
+
+            // Jump to NNN
+            vm.pc = nnn;
+        }
+
+        // All of the skip routines (including 9XY0, which is included here out of order)
+        // 0x3XNN, skip if VX == NN
+        0x3 => {
+            if vm.v[x] == nn {
+                vm.pc += 2
+            }
+        }
+        // 0x4XNN, skip if VX != NN
+        0x4 => {
+            if vm.v[x] != nn {
+                vm.pc += 2
+            }
+        }
+        // 0x5XY0, skip if VX == VY
+        0x5 => {
+            if vm.v[x] == vm.v[y] {
+                vm.pc += 2
+            }
+        }
+        // 0x9XY0, skip if VX != VY
+        0x9 => {
+            if vm.v[x] != vm.v[y] {
+                vm.pc += 2
+            }
+        }
+
         // 0x6NNN: Set register VX to NN
         0x6 => vm.v[x] = nn,
         // 0x7NNN: Add NN to VX, ignoring carry
         0x7 => vm.v[x] += nn,
+
+        0x8 => match n {
+            // 0x8XY0: Set VX to VY
+            0x0 => vm.v[x] = vm.v[y],
+            // 0x8XY1: Set VX to VX | VY
+            0x1 => vm.v[x] |= vm.v[y],
+            // 0x8XY2: Set VX to VX & VY
+            0x2 => vm.v[x] &= vm.v[y],
+            // 0x8XY3: Set VX to VX XOR VY
+            0x3 => vm.v[x] ^= vm.v[y],
+            // 0x8XY4: Set VX to VX + VY, accounting for carry
+            0x4 => match vm.v[x].checked_add(vm.v[y]) {
+                Some(sum) => vm.v[x] = sum,
+                None => {
+                    // Set overflow register
+                    vm.v[0xF] = 1;
+                    vm.v[x] = vm.v[x].wrapping_add(vm.v[y]);
+                }
+            },
+            // 0x8XY5: Set VX to VX - VY, accounting for carry
+            0x5 => {
+                vm.v[0xF] = (vm.v[x] > vm.v[y]) as u8;
+                vm.v[x] = vm.v[x].wrapping_sub(vm.v[y]);
+            }
+            // 0x8XY6: Store least significant bit of VX in VF and shift VX right by 1
+            0x6 => {
+                vm.v[0xF] = vm.v[x] & 0x1;
+                vm.v[x] >>= 1;
+            }
+            // 0x8XY7: Set VX to VY - VX, accounting for carry
+            0x7 => {
+                vm.v[0xF] = (vm.v[y] > vm.v[x]) as u8;
+                vm.v[x] = vm.v[y].wrapping_sub(vm.v[x]);
+            }
+            // 0x8XYE: Store most significant bit of VX in VF and shift VX left by 1
+            0xE => {
+                vm.v[0xF] = (vm.v[x] >> 7) & 0x1;
+                vm.v[x] <<= 1;
+            }
+            _ => exit_unknown_instruction(instruction, vm.pc),
+        },
+
         // 0xANNN: Set index register to NNN
         0xA => vm.ir = nnn,
+        // 0xBNNN: Jump to VX + NNN
+        0xB => vm.pc = vm.v[x] as u16 + nnn,
+        // 0xCXNN: Set VX to a random number AND'ed with NN
+        0xC => vm.v[x] = rand::random::<u8>() & nn,
         // 0xDXYN: Display
         0xD => {
             // Display n-byte sprite starting at memory location I at
@@ -171,8 +301,75 @@ fn processor_cycle(vm: &mut VM) {
                 }
             }
         }
+
+        0xE => match nn {
+            // 0xEX9E: skip instruction if key VX is being pressed
+            0x9E => {
+                if vm.keys_pressed[vm.v[x] as usize] {
+                    vm.pc += 2;
+                }
+            }
+            // 0xEXA1: skip instruction if key VX is not being pressed
+            0xA1 => {
+                if !vm.keys_pressed[vm.v[x] as usize] {
+                    vm.pc += 2;
+                }
+            }
+            _ => exit_unknown_instruction(instruction, vm.pc),
+        }
+
+	0xF => match nn {
+	    // 0xFX07: set VX to the current value of the delay timer
+	    0x07 => vm.v[x] = vm.delay_timer,
+	    // 0xFX15: set the delay timer to the value in VX
+	    0x15 => vm.delay_timer = vm.v[x],
+	    // 0xFX18: set the sound timer to the value in VX
+	    0x18 => vm.sound_timer = vm.v[x],
+	    // 0xFX1E: Add VX to I
+	    0x1E => match (vm.v[x] as u16).checked_add(vm.ir) {
+		// Overflow behavior is non-standard, but assumed safe
+                Some(sum) => vm.ir = sum,
+                None => {
+                    // Set overflow register
+                    vm.v[0xF] = 1;
+                    vm.ir = (vm.v[x] as u16).wrapping_add(vm.ir);
+                }
+	    }
+	    // 0xFX0A: Block until any key is pressed, put key in VX
+	    0x0A => {
+		// Decrement program counter to repeat this
+		// instruction in case a key isn't pressed
+		vm.pc -= 2;
+		for i in 0..0xF {
+		    if vm.keys_pressed[i] {
+			vm.v[x] = i as u8;
+			vm.pc += 2;
+		    }
+		}
+	    }
+	    // 0xFX29: Set I to font character in VX
+	    0x29 => vm.ir = FONT_MEMORY_START as u16 + vm.v[x] as u16 * 5, // Fonts are 5 bytes wide
+	    // 0xFX55: Store all registers from V0 to VX in I, I+1, I+2, ... I+X
+	    0x55 => {
+		for i in 0..x {
+		    vm.memory[vm.ir as usize + i as usize] = vm.v[i];
+		}
+	    }
+	    // 0xFX65: Store all memory from I, I+1, I+2, ... I+X in registers V0 to VX
+	    0x65 => {
+		for i in 0..x {
+		    vm.v[i] = vm.memory[vm.ir as usize + i as usize];
+		}
+	    }
+            _ => exit_unknown_instruction(instruction, vm.pc),
+	}
+
         _ => exit_unknown_instruction(instruction, vm.pc),
     }
+
+    // Increment program counter here instead of in each instruction
+    // so we don't forget.
+    vm.pc += 2;
 }
 
 // TODO: This should be a pure error value, not an exit
