@@ -123,63 +123,92 @@ fn processor_cycle(vm: &mut VM) {
     let n: u8 = (instruction & 0x000F) as u8;
 
     match op {
-	0x0 => match nnn {
-	    0x00E0 => { // Clear screen
-		for i in 0..DISPLAY_WIDTH_PX {
-		    for j in 0..DISPLAY_HEIGHT_PX {
-			vm.display[i][j] = false;
-		    }
-		}
-	    },
-	    _ => exit_unknown_instruction(instruction, vm.pc),
-	},
-	// 0x1NNN: Jump to NNN
-	0x1 => vm.pc = nnn,
-	// 0x6NNN: Set register VX to NN
-	0x6 => vm.v[x] = nn,
-	// 0x7NNN: Add NN to VX, ignoring carry
-	0x7 => vm.v[x] += nn,
-	// 0xANNN: Set index register to NNN
-	0xA => vm.ir = nnn,
-	// 0xDXYN: Display
-	0xD => {
-	    // Display n-byte sprite starting at memory location I at
-	    // (Vx, Vy), set VF = collision.
-	    let dx: u16 = vm.v[x] as u16 % DISPLAY_WIDTH_PX as u16;
-	    let dy: u16 = vm.v[y] as u16 % DISPLAY_HEIGHT_PX as u16;
+        0x0 => match nnn {
+            0x00E0 => {
+                // Clear screen
+                for i in 0..DISPLAY_WIDTH_PX {
+                    for j in 0..DISPLAY_HEIGHT_PX {
+                        vm.display[i][j] = false;
+                    }
+                }
+            }
+            _ => exit_unknown_instruction(instruction, vm.pc),
+        },
+        // 0x1NNN: Jump to NNN
+        0x1 => vm.pc = nnn,
+        // 0x6NNN: Set register VX to NN
+        0x6 => vm.v[x] = nn,
+        // 0x7NNN: Add NN to VX, ignoring carry
+        0x7 => vm.v[x] += nn,
+        // 0xANNN: Set index register to NNN
+        0xA => vm.ir = nnn,
+        // 0xDXYN: Display
+        0xD => {
+            // Display n-byte sprite starting at memory location I at
+            // (Vx, Vy), set VF = collision.
+            let dx: u16 = vm.v[x] as u16 % DISPLAY_WIDTH_PX as u16;
+            let dy: u16 = vm.v[y] as u16 % DISPLAY_HEIGHT_PX as u16;
 
-	    // Reset collision flag
-	    vm.v[0xF] = 0;
+            // Reset collision flag
+            vm.v[0xF] = 0;
 
-	    // Read n bytes from memory. j is the y value
-	    for j in 0..min(n as u16, DISPLAY_HEIGHT_PX as u16 - dy) {
-		let sprite_row: u8 = vm.memory[(vm.ir + j) as usize];
+            // Read n bytes from memory. j is the y value
+            for j in 0..min(n as u16, DISPLAY_HEIGHT_PX as u16 - dy) {
+                let sprite_row: u8 = vm.memory[(vm.ir + j) as usize];
 
-		// i is the x value we use to iterate over bits
-		for i in 0..min(8, DISPLAY_WIDTH_PX as u16 - dx) {
-		    // Bit shift to get the current row bit
-		    let sprite_bit: bool = ((sprite_row >> (7 - i)) & 0b1) == 1;
+                // i is the x value we use to iterate over bits
+                for i in 0..min(8, DISPLAY_WIDTH_PX as u16 - dx) {
+                    // Bit shift to get the current row bit
+                    let sprite_bit: bool = ((sprite_row >> (7 - i)) & 0b1) == 1;
 
-		    if vm.display[(dx + i) as usize][(dy + j) as usize] && sprite_bit {
-			// Set collision register
-			vm.v[0xF] = 1;
-		    }
+                    if vm.display[(dx + i) as usize][(dy + j) as usize] && sprite_bit {
+                        // Set collision register
+                        vm.v[0xF] = 1;
+                    }
 
-		    // XOR with current bit
-		    vm.display[(dx + i) as usize][(dy + j) as usize] ^= sprite_bit;
-		}
-	    }
-
-	},
-	_ => exit_unknown_instruction(instruction, vm.pc),
+                    // XOR with current bit
+                    vm.display[(dx + i) as usize][(dy + j) as usize] ^= sprite_bit;
+                }
+            }
+        }
+        _ => exit_unknown_instruction(instruction, vm.pc),
     }
 }
 
 // TODO: This should be a pure error value, not an exit
 fn exit_unknown_instruction(instruction: u16, pc: u16) {
-    eprintln!("Unknown instruction {:#04X?} (PC: {:#04X?})", instruction, pc);
+    eprintln!(
+        "Unknown instruction {:#04X?} (PC: {:#04X?})",
+        instruction, pc
+    );
     std::process::exit(1);
 }
+
+// enum Instruction {
+//     ClearScreen,
+// }
+
+// fn parse_instruction(instruction: u16) -> Instruction {
+//     let op: u8 = (instruction >> 12) as u8;
+//     let x: usize = ((instruction & 0x0F00) >> 8) as usize;
+//     let y: usize = ((instruction & 0x00F0) >> 4) as usize;
+//     let nnn: u16 = instruction & 0x0FFF;
+//     let nn: u8 = (instruction & 0x00FF) as u8;
+//     let n: u8 = (instruction & 0x000F) as u8;
+
+//     fn exit_unknown() {
+//         eprintln!("Unknown instruction {:#04X?}", instruction);
+//         std::process::exit(1);
+//     }
+
+//     match op {
+//         0x0 => match nnn {
+//             0x00E0 => Instruction::ClearScreen,
+//             _ => exit_unknown(),
+//         }
+//         _ => exit_unknown(),
+//     }
+// }
 
 fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
     let sdl_context = sdl2::init().expect("failed to init SDL context");
