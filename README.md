@@ -36,6 +36,25 @@ Rust:
 
 ## TODO
 
+- Fix Rust version on the corex89 test. Figure out when memory
+  location 248 is modified. Setting memory might be broken, or maybe
+  setting ir is broken. (The AX test doesn't show OK either)
+  - C version:
+    ```
+	...
+	instruction: 0xd9b4
+    instruction: 0x1248
+    instruction: 0xa202
+	...
+    ```
+  - Rust version:
+    ```
+	...
+	instruction 0xD9B4 (PC: 0x3D8)
+    instruction 0x1248 (PC: 0x3DA)
+    instruction 0xDAB4 (PC: 0x24A) <--- wrong!
+	...
+    ```
 - Add tests for C, just to practice testing C code.
 - Terminal graphics instead of SDL
   - Make this an option?

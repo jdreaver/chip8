@@ -135,6 +135,8 @@ fn processor_cycle(vm: &mut VM) {
     let instruction: u16 =
         (vm.memory[vm.pc as usize] as u16) << 8 | vm.memory[vm.pc as usize + 1] as u16;
 
+    println!("instruction {:#04X?} (PC: {:#04X?})", instruction, vm.pc);
+
     // TODO: Parse instructions into an enum, and then process them in
     // a second stage.
 
@@ -169,7 +171,7 @@ fn processor_cycle(vm: &mut VM) {
                         eprintln!("internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})", instruction, vm.pc);
                         std::process::exit(1);
                     }
-                    vm.pc = vm.stack[vm.sp];
+                    vm.pc = vm.stack[vm.sp - 1];
                     vm.sp -= 1;
                 }
                 _ => exit_unknown_instruction(instruction, vm.pc),
@@ -223,7 +225,7 @@ fn processor_cycle(vm: &mut VM) {
         // 0x6NNN: Set register VX to NN
         0x6 => vm.v[x] = nn,
         // 0x7NNN: Add NN to VX, ignoring carry
-        0x7 => vm.v[x] += nn,
+        0x7 => vm.v[x] = vm.v[x].wrapping_add(nn),
 
         0x8 => match n {
             // 0x8XY0: Set VX to VY
@@ -349,15 +351,21 @@ fn processor_cycle(vm: &mut VM) {
 	    }
 	    // 0xFX29: Set I to font character in VX
 	    0x29 => vm.ir = FONT_MEMORY_START as u16 + vm.v[x] as u16 * 5, // Fonts are 5 bytes wide
+	    // 0xFX33: Store 3 decimal digits of VX in I, I+1, I+2
+	    0x33 => {
+		vm.memory[vm.ir as usize] = vm.v[x] / 100;
+		vm.memory[vm.ir as usize + 1] = (vm.v[x] % 100) / 10;
+		vm.memory[vm.ir as usize + 2] = vm.v[x] % 10;
+	    }
 	    // 0xFX55: Store all registers from V0 to VX in I, I+1, I+2, ... I+X
 	    0x55 => {
-		for i in 0..x {
+		for i in 0..=x {
 		    vm.memory[vm.ir as usize + i as usize] = vm.v[i];
 		}
 	    }
 	    // 0xFX65: Store all memory from I, I+1, I+2, ... I+X in registers V0 to VX
 	    0x65 => {
-		for i in 0..x {
+		for i in 0..=x {
 		    vm.v[i] = vm.memory[vm.ir as usize + i as usize];
 		}
 	    }
