@@ -9,12 +9,18 @@
     in {
       devShell.x86_64-linux = pkgs.mkShell {
         buildInputs = with pkgs; [
-          cargo
-          rustc
+          # Common
           SDL2
 
+          # Rust
+          cargo
+          rustc
           clippy
           rustfmt
+
+          # C
+          gcc
+          gdb
         ];
       };
     };
