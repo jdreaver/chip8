@@ -135,7 +135,21 @@ fn processor_cycle(vm: &mut VM) {
     let instruction: u16 =
         (vm.memory[vm.pc as usize] as u16) << 8 | vm.memory[vm.pc as usize + 1] as u16;
 
-    println!("instruction {:#04X?} (PC: {:#04X?})", instruction, vm.pc);
+    let current_pc = vm.pc;
+    // println!("instruction {:#04X?} (PC: {:#04X?})", instruction, &current_pc);
+
+    // TODO: We should return and error value, not exit
+    let exit_unknown_instruction = || {
+	eprintln!(
+            "Unknown instruction {:#04X?} (PC: {:#04X?})",
+            instruction, current_pc
+	);
+	std::process::exit(1);
+    };
+
+    // Increment program counter here instead of in each instruction
+    // so we don't forget.
+    vm.pc += 2;
 
     // TODO: Parse instructions into an enum, and then process them in
     // a second stage.
@@ -174,7 +188,7 @@ fn processor_cycle(vm: &mut VM) {
                     vm.pc = vm.stack[vm.sp - 1];
                     vm.sp -= 1;
                 }
-                _ => exit_unknown_instruction(instruction, vm.pc),
+                _ => exit_unknown_instruction(),
             }
         }
         // 0x1NNN: Jump to NNN
@@ -265,7 +279,7 @@ fn processor_cycle(vm: &mut VM) {
                 vm.v[0xF] = (vm.v[x] >> 7) & 0x1;
                 vm.v[x] <<= 1;
             }
-            _ => exit_unknown_instruction(instruction, vm.pc),
+            _ => exit_unknown_instruction(),
         },
 
         // 0xANNN: Set index register to NNN
@@ -317,7 +331,7 @@ fn processor_cycle(vm: &mut VM) {
                     vm.pc += 2;
                 }
             }
-            _ => exit_unknown_instruction(instruction, vm.pc),
+            _ => exit_unknown_instruction(),
         }
 
 	0xF => match nn {
@@ -369,24 +383,11 @@ fn processor_cycle(vm: &mut VM) {
 		    vm.v[i] = vm.memory[vm.ir as usize + i as usize];
 		}
 	    }
-            _ => exit_unknown_instruction(instruction, vm.pc),
+            _ => exit_unknown_instruction(),
 	}
 
-        _ => exit_unknown_instruction(instruction, vm.pc),
+        _ => exit_unknown_instruction(),
     }
-
-    // Increment program counter here instead of in each instruction
-    // so we don't forget.
-    vm.pc += 2;
-}
-
-// TODO: This should be a pure error value, not an exit
-fn exit_unknown_instruction(instruction: u16, pc: u16) {
-    eprintln!(
-        "Unknown instruction {:#04X?} (PC: {:#04X?})",
-        instruction, pc
-    );
-    std::process::exit(1);
 }
 
 // enum Instruction {
