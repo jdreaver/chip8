@@ -5,6 +5,7 @@ use std::env;
 use std::fs::File;
 use std::io;
 use std::io::Read;
+use std::os::unix::prelude::MetadataExt;
 use std::path::Path;
 
 const MEMORY_BYTES: usize = 4096;
@@ -129,9 +130,14 @@ const FONT_BYTES: [u8; 80] = [
 
 fn load_rom_file(memory: &mut Memory, path: &Path) -> io::Result<()> {
     let mut f = File::open(path)?;
+    let metadata = f.metadata()?;
 
     // Rom memory starts at 0x200
-    f.read(&mut memory[0x200..])?;
+    let amount_read = f.read(&mut memory[0x200..])?;
+    if amount_read as u64 != metadata.size() {
+        eprintln!("Read {} bytes of ROM file, but file size is {}", amount_read, metadata.size());
+        std::process::exit(1);
+    }
 
     // Load font into 0x050–0x09F
     memory[0x050..=0x09F].copy_from_slice(&FONT_BYTES);
@@ -488,11 +494,10 @@ fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
         .opengl()
         .build()
         .expect("failed to create SDL window");
-    let canvas = window
+    window
         .into_canvas()
         .build()
-        .expect("failed to create SDL canvas");
-    canvas
+        .expect("failed to create SDL canvas")
 }
 
 fn draw_display(
