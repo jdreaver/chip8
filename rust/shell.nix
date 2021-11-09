@@ -1,12 +1,3 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ system ? builtins.currentSystem }:
 
-pkgs.mkShell {
-  buildInputs = with pkgs; [
-    cargo
-    rustc
-    SDL2
-
-    clippy
-    rustfmt
-  ];
-}
+(builtins.getFlake (toString ./.)).devShell.${system}
