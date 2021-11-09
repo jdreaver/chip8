@@ -36,7 +36,10 @@ fn main() {
     vm.display[55][2] = true;
 
     loop {
-        processor_cycle(&mut vm);
+        if let Err(err) = processor_cycle(&mut vm) {
+            eprintln!("Error in processor cycle: {}", err);
+            std::process::exit(1);
+        }
 
         // TODO: Only draw display when display is updated
         // (set a bit on instructions in processor_cycle that
@@ -91,8 +94,8 @@ impl VM {
             stack: [0; MAX_STACK_SIZE],
             v: [0; 16],
             keys_pressed: [false; 16],
-	    delay_timer: 0,
-	    sound_timer: 0,
+            delay_timer: 0,
+            sound_timer: 0,
         }
     }
 }
@@ -100,22 +103,22 @@ impl VM {
 const FONT_MEMORY_START: usize = 0x050;
 
 const FONT_BYTES: [u8; 80] = [
-	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-	0x20, 0x60, 0x20, 0x20, 0x70, // 1
-	0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-	0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-	0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-	0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-	0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-	0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-	0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-	0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-	0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-	0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-	0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-	0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-	0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-	0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
 fn load_rom_file(vm: &mut VM, path: &Path) -> io::Result<()> {
@@ -130,7 +133,7 @@ fn load_rom_file(vm: &mut VM, path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn processor_cycle(vm: &mut VM) {
+fn processor_cycle(vm: &mut VM) -> Result<(), String> {
     // Instructions are two bytes
     let instruction: u16 =
         (vm.memory[vm.pc as usize] as u16) << 8 | vm.memory[vm.pc as usize + 1] as u16;
@@ -138,14 +141,10 @@ fn processor_cycle(vm: &mut VM) {
     let current_pc = vm.pc;
     // println!("instruction {:#04X?} (PC: {:#04X?})", instruction, &current_pc);
 
-    // TODO: We should return and error value, not exit
-    let exit_unknown_instruction = || {
-	eprintln!(
-            "Unknown instruction {:#04X?} (PC: {:#04X?})",
-            instruction, current_pc
-	);
-	std::process::exit(1);
-    };
+    let unknown_instruction_error = Err(format!(
+        "Unknown instruction {:#04X?} (PC: {:#04X?})",
+        instruction, current_pc
+    ));
 
     // Increment program counter here instead of in each instruction
     // so we don't forget.
@@ -188,7 +187,7 @@ fn processor_cycle(vm: &mut VM) {
                     vm.pc = vm.stack[vm.sp - 1];
                     vm.sp -= 1;
                 }
-                _ => exit_unknown_instruction(),
+                _ => return unknown_instruction_error,
             }
         }
         // 0x1NNN: Jump to NNN
@@ -279,7 +278,7 @@ fn processor_cycle(vm: &mut VM) {
                 vm.v[0xF] = (vm.v[x] >> 7) & 0x1;
                 vm.v[x] <<= 1;
             }
-            _ => exit_unknown_instruction(),
+            _ => return unknown_instruction_error,
         },
 
         // 0xANNN: Set index register to NNN
@@ -331,63 +330,65 @@ fn processor_cycle(vm: &mut VM) {
                     vm.pc += 2;
                 }
             }
-            _ => exit_unknown_instruction(),
-        }
+            _ => return unknown_instruction_error,
+        },
 
-	0xF => match nn {
-	    // 0xFX07: set VX to the current value of the delay timer
-	    0x07 => vm.v[x] = vm.delay_timer,
-	    // 0xFX15: set the delay timer to the value in VX
-	    0x15 => vm.delay_timer = vm.v[x],
-	    // 0xFX18: set the sound timer to the value in VX
-	    0x18 => vm.sound_timer = vm.v[x],
-	    // 0xFX1E: Add VX to I
-	    0x1E => match (vm.v[x] as u16).checked_add(vm.ir) {
-		// Overflow behavior is non-standard, but assumed safe
+        0xF => match nn {
+            // 0xFX07: set VX to the current value of the delay timer
+            0x07 => vm.v[x] = vm.delay_timer,
+            // 0xFX15: set the delay timer to the value in VX
+            0x15 => vm.delay_timer = vm.v[x],
+            // 0xFX18: set the sound timer to the value in VX
+            0x18 => vm.sound_timer = vm.v[x],
+            // 0xFX1E: Add VX to I
+            0x1E => match (vm.v[x] as u16).checked_add(vm.ir) {
+                // Overflow behavior is non-standard, but assumed safe
                 Some(sum) => vm.ir = sum,
                 None => {
                     // Set overflow register
                     vm.v[0xF] = 1;
                     vm.ir = (vm.v[x] as u16).wrapping_add(vm.ir);
                 }
-	    }
-	    // 0xFX0A: Block until any key is pressed, put key in VX
-	    0x0A => {
-		// Decrement program counter to repeat this
-		// instruction in case a key isn't pressed
-		vm.pc -= 2;
-		for i in 0..0xF {
-		    if vm.keys_pressed[i] {
-			vm.v[x] = i as u8;
-			vm.pc += 2;
-		    }
-		}
-	    }
-	    // 0xFX29: Set I to font character in VX
-	    0x29 => vm.ir = FONT_MEMORY_START as u16 + vm.v[x] as u16 * 5, // Fonts are 5 bytes wide
-	    // 0xFX33: Store 3 decimal digits of VX in I, I+1, I+2
-	    0x33 => {
-		vm.memory[vm.ir as usize] = vm.v[x] / 100;
-		vm.memory[vm.ir as usize + 1] = (vm.v[x] % 100) / 10;
-		vm.memory[vm.ir as usize + 2] = vm.v[x] % 10;
-	    }
-	    // 0xFX55: Store all registers from V0 to VX in I, I+1, I+2, ... I+X
-	    0x55 => {
-		for i in 0..=x {
-		    vm.memory[vm.ir as usize + i as usize] = vm.v[i];
-		}
-	    }
-	    // 0xFX65: Store all memory from I, I+1, I+2, ... I+X in registers V0 to VX
-	    0x65 => {
-		for i in 0..=x {
-		    vm.v[i] = vm.memory[vm.ir as usize + i as usize];
-		}
-	    }
-            _ => exit_unknown_instruction(),
-	}
+            },
+            // 0xFX0A: Block until any key is pressed, put key in VX
+            0x0A => {
+                // Decrement program counter to repeat this
+                // instruction in case a key isn't pressed
+                vm.pc -= 2;
+                for i in 0..0xF {
+                    if vm.keys_pressed[i] {
+                        vm.v[x] = i as u8;
+                        vm.pc += 2;
+                    }
+                }
+            }
+            // 0xFX29: Set I to font character in VX
+            0x29 => vm.ir = FONT_MEMORY_START as u16 + vm.v[x] as u16 * 5, // Fonts are 5 bytes wide
+            // 0xFX33: Store 3 decimal digits of VX in I, I+1, I+2
+            0x33 => {
+                vm.memory[vm.ir as usize] = vm.v[x] / 100;
+                vm.memory[vm.ir as usize + 1] = (vm.v[x] % 100) / 10;
+                vm.memory[vm.ir as usize + 2] = vm.v[x] % 10;
+            }
+            // 0xFX55: Store all registers from V0 to VX in I, I+1, I+2, ... I+X
+            0x55 => {
+                for i in 0..=x {
+                    vm.memory[vm.ir as usize + i as usize] = vm.v[i];
+                }
+            }
+            // 0xFX65: Store all memory from I, I+1, I+2, ... I+X in registers V0 to VX
+            0x65 => {
+                for i in 0..=x {
+                    vm.v[i] = vm.memory[vm.ir as usize + i as usize];
+                }
+            }
+            _ => return unknown_instruction_error,
+        },
 
-        _ => exit_unknown_instruction(),
+        _ => return unknown_instruction_error,
     }
+
+    Ok(())
 }
 
 // enum Instruction {
