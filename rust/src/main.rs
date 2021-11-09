@@ -1,5 +1,3 @@
-extern crate sdl2;
-
 use std::cmp::min;
 use std::env;
 use std::fs::File;
@@ -7,6 +5,7 @@ use std::io;
 use std::io::Read;
 use std::os::unix::prelude::MetadataExt;
 use std::path::Path;
+use sdl2;
 
 const MEMORY_BYTES: usize = 4096;
 
