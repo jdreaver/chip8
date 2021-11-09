@@ -25,7 +25,7 @@ fn main() {
     let rom_path = Path::new(&args[0]);
     let mut vm = VM::new();
 
-    if let Err(err) = load_rom_file(&mut vm, &rom_path) {
+    if let Err(err) = load_rom_file(&mut vm.memory, &rom_path) {
         eprintln!("Error loading ROM file {}: {}", &rom_path.display(), err);
         std::process::exit(1);
     }
@@ -36,6 +36,8 @@ fn main() {
     vm.display[55][2] = true;
 
     loop {
+	// TODO: Process SDL events for keypresses
+
         if let Err(err) = processor_cycle(&mut vm) {
             eprintln!("Error in processor cycle: {}", err);
             std::process::exit(1);
@@ -60,8 +62,8 @@ fn main() {
 const MAX_STACK_SIZE: usize = 100;
 
 struct VM {
-    memory: [u8; MEMORY_BYTES],
-    display: [[bool; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
+    memory: Memory,
+    display: Display,
 
     // Program counter
     pc: u16,
@@ -71,7 +73,7 @@ struct VM {
 
     // Stack is for subroutines
     sp: usize, // Points to element after top of stack (starts at 0 when stack empty)
-    stack: [u16; MAX_STACK_SIZE],
+    stack: CallStack,
 
     // General purpose registers
     v: [u8; 16],
@@ -82,6 +84,10 @@ struct VM {
     delay_timer: u8,
     sound_timer: u8,
 }
+
+type Memory = [u8; MEMORY_BYTES];
+type Display = [[bool; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX];
+type CallStack = [u16; MAX_STACK_SIZE];
 
 impl VM {
     fn new() -> VM {
@@ -121,14 +127,14 @@ const FONT_BYTES: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
-fn load_rom_file(vm: &mut VM, path: &Path) -> io::Result<()> {
+fn load_rom_file(memory: &mut Memory, path: &Path) -> io::Result<()> {
     let mut f = File::open(path)?;
 
     // Rom memory starts at 0x200
-    f.read(&mut vm.memory[0x200..])?;
+    f.read(&mut memory[0x200..])?;
 
     // Load font into 0x050–0x09F
-    vm.memory[0x050..=0x09F].copy_from_slice(&FONT_BYTES);
+    memory[0x050..=0x09F].copy_from_slice(&FONT_BYTES);
 
     Ok(())
 }
@@ -491,7 +497,7 @@ fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
 
 fn draw_display(
     canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
-    display: [[bool; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
+    display: Display,
 ) {
     canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
     canvas.clear();
