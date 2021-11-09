@@ -451,40 +451,43 @@ fn parse_instruction(instruction: u16) -> Result<Instruction, String> {
 
 #[test]
 fn test_parse_instruction() {
-    assert_eq!(parse_instruction(0x00E0), Ok(Instruction::ClearScreen));
-    assert_eq!(parse_instruction(0x00EE), Ok(Instruction::SubroutineReturn));
-    assert_eq!(parse_instruction(0x1ABC), Ok(Instruction::Jump { nnn: 0xABC }));
-    assert_eq!(parse_instruction(0x2ABC), Ok(Instruction::SubroutineCall { nnn: 0xABC }));
-    assert_eq!(parse_instruction(0x3ABC), Ok(Instruction::SkipVxEqNn { x: 0xA, nn: 0xBC }));
-    assert_eq!(parse_instruction(0x4ABC), Ok(Instruction::SkipVxNeqNn { x: 0xA, nn: 0xBC }));
-    assert_eq!(parse_instruction(0x5ABC), Ok(Instruction::SkipVxEqVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x6ABC), Ok(Instruction::SetVxNn { x: 0xA, nn: 0xBC }));
-    assert_eq!(parse_instruction(0x7ABC), Ok(Instruction::AddNnVx { x: 0xA, nn: 0xBC }));
-    assert_eq!(parse_instruction(0x8AB0), Ok(Instruction::SetVxVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x8AB1), Ok(Instruction::SetVxOrVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x8AB2), Ok(Instruction::SetVxAndVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x8AB3), Ok(Instruction::SetVxXorVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x8AB4), Ok(Instruction::SetVxPlusVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x8AB5), Ok(Instruction::SetVxMinusVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x8AB6), Ok(Instruction::ShiftVxRight { x: 0xA }));
-    assert_eq!(parse_instruction(0x8AB7), Ok(Instruction::SetVyMinusVx { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0x8ABE), Ok(Instruction::ShiftVxLeft { x: 0xA }));
-    assert_eq!(parse_instruction(0x9ABC), Ok(Instruction::SkipVxNeqVy { x: 0xA, y: 0xB }));
-    assert_eq!(parse_instruction(0xAABC), Ok(Instruction::SetIndexNnn { nnn: 0xABC }));
-    assert_eq!(parse_instruction(0xBABC), Ok(Instruction::JumpV0Nnn { nnn: 0xABC }));
-    assert_eq!(parse_instruction(0xCABC), Ok(Instruction::SetVxRandNn { x: 0xA, nn: 0xBC }));
-    assert_eq!(parse_instruction(0xDABC), Ok(Instruction::Display { x: 0xA, y: 0xB, n: 0xC }));
-    assert_eq!(parse_instruction(0xE19E), Ok(Instruction::SkipIfVxPressed { x: 1 }));
-    assert_eq!(parse_instruction(0xE2A1), Ok(Instruction::SkipIfVxNotPressed { x: 2 }));
-    assert_eq!(parse_instruction(0xF307), Ok(Instruction::SetVxDelay { x: 3 }));
-    assert_eq!(parse_instruction(0xF415), Ok(Instruction::SetDelayVx { x: 4 }));
-    assert_eq!(parse_instruction(0xF518), Ok(Instruction::SetSoundVx { x: 5 }));
-    assert_eq!(parse_instruction(0xF61E), Ok(Instruction::AddVxI { x: 6 }));
-    assert_eq!(parse_instruction(0xF70A), Ok(Instruction::BlockUntilAnyKey { x: 7 }));
-    assert_eq!(parse_instruction(0xF829), Ok(Instruction::SetIFontVx { x: 8 }));
-    assert_eq!(parse_instruction(0xF933), Ok(Instruction::StoreVxDigitsI { x: 9 }));
-    assert_eq!(parse_instruction(0xFA55), Ok(Instruction::StoreVxI { x: 0xA }));
-    assert_eq!(parse_instruction(0xFB65), Ok(Instruction::StoreIVx { x: 0xB }));
+    let assert_parse = |raw: u16, instruction: Instruction| {
+	assert_eq!(parse_instruction(raw), Ok(instruction));
+    };
+    assert_parse(0x00E0, Instruction::ClearScreen);
+    assert_parse(0x00EE, Instruction::SubroutineReturn);
+    assert_parse(0x1ABC, Instruction::Jump { nnn: 0xABC });
+    assert_parse(0x2ABC, Instruction::SubroutineCall { nnn: 0xABC });
+    assert_parse(0x3ABC, Instruction::SkipVxEqNn { x: 0xA, nn: 0xBC });
+    assert_parse(0x4ABC, Instruction::SkipVxNeqNn { x: 0xA, nn: 0xBC });
+    assert_parse(0x5ABC, Instruction::SkipVxEqVy { x: 0xA, y: 0xB });
+    assert_parse(0x6ABC, Instruction::SetVxNn { x: 0xA, nn: 0xBC });
+    assert_parse(0x7ABC, Instruction::AddNnVx { x: 0xA, nn: 0xBC });
+    assert_parse(0x8AB0, Instruction::SetVxVy { x: 0xA, y: 0xB });
+    assert_parse(0x8AB1, Instruction::SetVxOrVy { x: 0xA, y: 0xB });
+    assert_parse(0x8AB2, Instruction::SetVxAndVy { x: 0xA, y: 0xB });
+    assert_parse(0x8AB3, Instruction::SetVxXorVy { x: 0xA, y: 0xB });
+    assert_parse(0x8AB4, Instruction::SetVxPlusVy { x: 0xA, y: 0xB });
+    assert_parse(0x8AB5, Instruction::SetVxMinusVy { x: 0xA, y: 0xB });
+    assert_parse(0x8AB6, Instruction::ShiftVxRight { x: 0xA });
+    assert_parse(0x8AB7, Instruction::SetVyMinusVx { x: 0xA, y: 0xB });
+    assert_parse(0x8ABE, Instruction::ShiftVxLeft { x: 0xA });
+    assert_parse(0x9ABC, Instruction::SkipVxNeqVy { x: 0xA, y: 0xB });
+    assert_parse(0xAABC, Instruction::SetIndexNnn { nnn: 0xABC });
+    assert_parse(0xBABC, Instruction::JumpV0Nnn { nnn: 0xABC });
+    assert_parse(0xCABC, Instruction::SetVxRandNn { x: 0xA, nn: 0xBC });
+    assert_parse(0xDABC, Instruction::Display { x: 0xA, y: 0xB, n: 0xC });
+    assert_parse(0xE19E, Instruction::SkipIfVxPressed { x: 1 });
+    assert_parse(0xE2A1, Instruction::SkipIfVxNotPressed { x: 2 });
+    assert_parse(0xF307, Instruction::SetVxDelay { x: 3 });
+    assert_parse(0xF415, Instruction::SetDelayVx { x: 4 });
+    assert_parse(0xF518, Instruction::SetSoundVx { x: 5 });
+    assert_parse(0xF61E, Instruction::AddVxI { x: 6 });
+    assert_parse(0xF70A, Instruction::BlockUntilAnyKey { x: 7 });
+    assert_parse(0xF829, Instruction::SetIFontVx { x: 8 });
+    assert_parse(0xF933, Instruction::StoreVxDigitsI { x: 9 });
+    assert_parse(0xFA55, Instruction::StoreVxI { x: 0xA });
+    assert_parse(0xFB65, Instruction::StoreIVx { x: 0xB });
 }
 
 fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
