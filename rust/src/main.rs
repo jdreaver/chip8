@@ -37,7 +37,7 @@ fn main() {
     vm.display[55][2] = true;
 
     loop {
-	// TODO: Process SDL events for keypresses
+        // TODO: Process SDL events for keypresses
 
         if let Err(err) = processor_cycle(&mut vm) {
             eprintln!("Error in processor cycle: {}", err);
@@ -135,7 +135,11 @@ fn load_rom_file(memory: &mut Memory, path: &Path) -> io::Result<()> {
     // Rom memory starts at 0x200
     let amount_read = f.read(&mut memory[0x200..])?;
     if amount_read as u64 != metadata.size() {
-        eprintln!("Read {} bytes of ROM file, but file size is {}", amount_read, metadata.size());
+        eprintln!(
+            "Read {} bytes of ROM file, but file size is {}",
+            amount_read,
+            metadata.size()
+        );
         std::process::exit(1);
     }
 
@@ -166,7 +170,10 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
         }
         Instruction::SubroutineReturn => {
             if vm.sp == 0 {
-                eprintln!("internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})", raw_instruction, vm.pc);
+                eprintln!(
+                    "internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})",
+                    raw_instruction, vm.pc
+                );
                 std::process::exit(1);
             }
             vm.pc = vm.stack[vm.sp - 1];
@@ -221,12 +228,12 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
                 vm.v[0xF] = 1;
                 vm.v[x] = vm.v[x].wrapping_add(vm.v[y]);
             }
-        }
+        },
         Instruction::SetVxMinusVy { x, y } => {
             vm.v[0xF] = (vm.v[x] > vm.v[y]) as u8;
             vm.v[x] = vm.v[x].wrapping_sub(vm.v[y]);
         }
-	Instruction::ShiftVxRight { x } => {
+        Instruction::ShiftVxRight { x } => {
             vm.v[0xF] = vm.v[x] & 0x1;
             vm.v[x] >>= 1;
         }
@@ -234,7 +241,7 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
             vm.v[0xF] = (vm.v[y] > vm.v[x]) as u8;
             vm.v[x] = vm.v[y].wrapping_sub(vm.v[x]);
         }
-	Instruction::ShiftVxLeft { x } => {
+        Instruction::ShiftVxLeft { x } => {
             vm.v[0xF] = (vm.v[x] >> 7) & 0x1;
             vm.v[x] <<= 1;
         }
@@ -273,7 +280,7 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
             if vm.keys_pressed[vm.v[x] as usize] {
                 vm.pc += 2;
             }
-	}
+        }
         Instruction::SkipIfVxNotPressed { x } => {
             if !vm.keys_pressed[vm.v[x] as usize] {
                 vm.pc += 2;
@@ -290,7 +297,7 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
                 vm.v[0xF] = 1;
                 vm.ir = (vm.v[x] as u16).wrapping_add(vm.ir);
             }
-        }
+        },
         Instruction::BlockUntilAnyKey { x } => {
             // Decrement program counter to repeat this
             // instruction in case a key isn't pressed
@@ -407,37 +414,37 @@ fn parse_instruction(instruction: u16) -> Result<Instruction, String> {
         (0, 0, 0xE, 0) => Ok(Instruction::ClearScreen),
         (0, 0, 0xE, 0xE) => Ok(Instruction::SubroutineReturn),
         (1, _, _, _) => Ok(Instruction::Jump { nnn }),
-	(2, _, _, _) => Ok(Instruction::SubroutineCall { nnn }),
-	(3, _, _, _) => Ok(Instruction::SkipVxEqNn { x, nn }),
-	(4, _, _, _) => Ok(Instruction::SkipVxNeqNn { x, nn }),
-	(5, _, _, _) => Ok(Instruction::SkipVxEqVy { x, y }),
-	(6, _, _, _) => Ok(Instruction::SetVxNn { x, nn }),
-	(7, _, _, _) => Ok(Instruction::AddNnVx { x, nn }),
-	(8, _, _, 0) => Ok(Instruction::SetVxVy { x, y }),
-	(8, _, _, 1) => Ok(Instruction::SetVxOrVy { x, y }),
-	(8, _, _, 2) => Ok(Instruction::SetVxAndVy { x, y }),
-	(8, _, _, 3) => Ok(Instruction::SetVxXorVy { x, y }),
-	(8, _, _, 4) => Ok(Instruction::SetVxPlusVy { x, y }),
-	(8, _, _, 5) => Ok(Instruction::SetVxMinusVy { x, y }),
-	(8, _, _, 6) => Ok(Instruction::ShiftVxRight { x }),
-	(8, _, _, 7) => Ok(Instruction::SetVyMinusVx { x, y }),
-	(8, _, _, 0xE) => Ok(Instruction::ShiftVxLeft { x }),
-	(9, _, _, _) => Ok(Instruction::SkipVxNeqVy { x, y }),
-	(0xA, _, _, _) => Ok(Instruction::SetIndexNnn { nnn }),
-	(0xB, _, _, _) => Ok(Instruction::JumpV0Nnn { nnn }),
-	(0xC, _, _, _) => Ok(Instruction::SetVxRandNn { x, nn }),
-	(0xD, _, _, _) => Ok(Instruction::Display { x, y, n }),
-	(0xE, _, 9, 0xE) => Ok(Instruction::SkipIfVxPressed { x }),
-	(0xE, _, 0xA, 1) => Ok(Instruction::SkipIfVxNotPressed { x }),
-	(0xF, _, 0, 7) => Ok(Instruction::SetVxDelay { x }),
-	(0xF, _, 1, 5) => Ok(Instruction::SetDelayVx { x }),
-	(0xF, _, 1, 8) => Ok(Instruction::SetSoundVx { x }),
-	(0xF, _, 1, 0xE) => Ok(Instruction::AddVxI { x }),
-	(0xF, _, 0, 0xA) => Ok(Instruction::BlockUntilAnyKey { x }),
-	(0xF, _, 2, 9) => Ok(Instruction::SetIFontVx { x }),
-	(0xF, _, 3, 3) => Ok(Instruction::StoreVxDigitsI { x }),
-	(0xF, _, 5, 5) => Ok(Instruction::StoreVxI { x }),
-	(0xF, _, 6, 5) => Ok(Instruction::StoreIVx { x }),
+        (2, _, _, _) => Ok(Instruction::SubroutineCall { nnn }),
+        (3, _, _, _) => Ok(Instruction::SkipVxEqNn { x, nn }),
+        (4, _, _, _) => Ok(Instruction::SkipVxNeqNn { x, nn }),
+        (5, _, _, _) => Ok(Instruction::SkipVxEqVy { x, y }),
+        (6, _, _, _) => Ok(Instruction::SetVxNn { x, nn }),
+        (7, _, _, _) => Ok(Instruction::AddNnVx { x, nn }),
+        (8, _, _, 0) => Ok(Instruction::SetVxVy { x, y }),
+        (8, _, _, 1) => Ok(Instruction::SetVxOrVy { x, y }),
+        (8, _, _, 2) => Ok(Instruction::SetVxAndVy { x, y }),
+        (8, _, _, 3) => Ok(Instruction::SetVxXorVy { x, y }),
+        (8, _, _, 4) => Ok(Instruction::SetVxPlusVy { x, y }),
+        (8, _, _, 5) => Ok(Instruction::SetVxMinusVy { x, y }),
+        (8, _, _, 6) => Ok(Instruction::ShiftVxRight { x }),
+        (8, _, _, 7) => Ok(Instruction::SetVyMinusVx { x, y }),
+        (8, _, _, 0xE) => Ok(Instruction::ShiftVxLeft { x }),
+        (9, _, _, _) => Ok(Instruction::SkipVxNeqVy { x, y }),
+        (0xA, _, _, _) => Ok(Instruction::SetIndexNnn { nnn }),
+        (0xB, _, _, _) => Ok(Instruction::JumpV0Nnn { nnn }),
+        (0xC, _, _, _) => Ok(Instruction::SetVxRandNn { x, nn }),
+        (0xD, _, _, _) => Ok(Instruction::Display { x, y, n }),
+        (0xE, _, 9, 0xE) => Ok(Instruction::SkipIfVxPressed { x }),
+        (0xE, _, 0xA, 1) => Ok(Instruction::SkipIfVxNotPressed { x }),
+        (0xF, _, 0, 7) => Ok(Instruction::SetVxDelay { x }),
+        (0xF, _, 1, 5) => Ok(Instruction::SetDelayVx { x }),
+        (0xF, _, 1, 8) => Ok(Instruction::SetSoundVx { x }),
+        (0xF, _, 1, 0xE) => Ok(Instruction::AddVxI { x }),
+        (0xF, _, 0, 0xA) => Ok(Instruction::BlockUntilAnyKey { x }),
+        (0xF, _, 2, 9) => Ok(Instruction::SetIFontVx { x }),
+        (0xF, _, 3, 3) => Ok(Instruction::StoreVxDigitsI { x }),
+        (0xF, _, 5, 5) => Ok(Instruction::StoreVxI { x }),
+        (0xF, _, 6, 5) => Ok(Instruction::StoreIVx { x }),
         _ => Err(format!("Unknown instruction {:#04X?}", instruction)),
     }
 }
@@ -500,10 +507,7 @@ fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
         .expect("failed to create SDL canvas")
 }
 
-fn draw_display(
-    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
-    display: Display,
-) {
+fn draw_display(canvas: &mut sdl2::render::Canvas<sdl2::video::Window>, display: Display) {
     canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
     canvas.clear();
 
