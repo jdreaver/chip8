@@ -38,9 +38,6 @@ fn main() {
             std::process::exit(1);
         }
 
-        // TODO: Only draw display when display is updated
-        // (set a bit on instructions in processor_cycle that
-        // update the screen)
         vm.display.paint();
 
         // TODO: Perform more accurate clock speed emulation
