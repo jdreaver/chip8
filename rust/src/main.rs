@@ -2,6 +2,7 @@ mod display;
 mod instruction;
 
 use std::cmp::min;
+use std::collections::VecDeque;
 use std::env;
 use std::fs::File;
 use std::io;
@@ -51,8 +52,6 @@ fn main() {
     }
 }
 
-const MAX_STACK_SIZE: usize = 100;
-
 struct VM {
     memory: Memory,
     display: display::Display,
@@ -64,8 +63,7 @@ struct VM {
     ir: u16,
 
     // Stack is for subroutines
-    sp: usize, // Points to element after top of stack (starts at 0 when stack empty)
-    stack: CallStack,
+    stack: VecDeque<u16>,
 
     // General purpose registers
     v: [u8; 16],
@@ -78,7 +76,6 @@ struct VM {
 }
 
 type Memory = [u8; MEMORY_BYTES];
-type CallStack = [u16; MAX_STACK_SIZE];
 
 impl VM {
     fn new() -> VM {
@@ -87,8 +84,7 @@ impl VM {
             display: display::Display::new(),
             pc: 0x200,
             ir: 0,
-            sp: 0,
-            stack: [0; MAX_STACK_SIZE],
+            stack: VecDeque::new(),
             v: [0; 16],
             keys_pressed: [false; 16],
             delay_timer: 0,
@@ -153,31 +149,21 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
     match parse_instruction(raw_instruction)? {
         Instruction::ClearScreen => vm.display.clear(),
         Instruction::SubroutineReturn => {
-            if vm.sp == 0 {
-                eprintln!(
-                    "internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})",
-                    raw_instruction, vm.pc
-                );
-                std::process::exit(1);
-            }
-            vm.pc = vm.stack[vm.sp - 1];
-            vm.sp -= 1;
+	    match vm.stack.pop_back() {
+		None => {
+                    eprintln!(
+			"internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})",
+			raw_instruction, vm.pc
+                    );
+                    std::process::exit(1);
+		}
+		Some(pc) => vm.pc = pc,
+	    }
         }
         Instruction::Jump { nnn } => vm.pc = nnn,
         Instruction::SubroutineCall { nnn } => {
-            // Add old PC to stack
-            if vm.sp == MAX_STACK_SIZE {
-                eprintln!(
-                    "stack overflow! instruction {:#04X?} (PC: {:#04X?})",
-                    raw_instruction, vm.pc
-                );
-                std::process::exit(1);
-            }
-            vm.stack[vm.sp] = vm.pc;
-            vm.sp += 1;
-
-            // Jump to NNN
-            vm.pc = nnn;
+            vm.stack.push_back(vm.pc);
+            vm.pc = nnn; // Jump to NNN
         }
         Instruction::SkipVxEqNn { x, nn } => {
             if vm.v[x] == nn {
