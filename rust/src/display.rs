@@ -43,12 +43,10 @@ impl Display {
             return;
         }
 
-        self.canvas
-            .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
+        self.canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
         self.canvas.clear();
 
-        self.canvas
-            .set_draw_color(sdl2::pixels::Color::RGB(255, 255, 255)); // White
+        self.canvas.set_draw_color(sdl2::pixels::Color::RGB(255, 255, 255)); // White
 
         for i in 0..DISPLAY_WIDTH_PX {
             for j in 0..DISPLAY_HEIGHT_PX {
@@ -74,9 +72,7 @@ impl Display {
 
 fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
     let sdl_context = sdl2::init().expect("failed to init SDL context");
-    let video_subsystem = sdl_context
-        .video()
-        .expect("failed to init SDL video subsystem");
+    let video_subsystem = sdl_context.video().expect("failed to init SDL video subsystem");
 
     let window_width = (DISPLAY_WIDTH_PX * PIXEL_SCALE_FACTOR) as u32;
     let window_height = (DISPLAY_HEIGHT_PX * PIXEL_SCALE_FACTOR) as u32;
@@ -86,8 +82,5 @@ fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
         .opengl()
         .build()
         .expect("failed to create SDL window");
-    window
-        .into_canvas()
-        .build()
-        .expect("failed to create SDL canvas")
+    window.into_canvas().build().expect("failed to create SDL canvas")
 }

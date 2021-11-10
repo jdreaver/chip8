@@ -46,9 +46,7 @@ fn main() {
         // recording the nanosecond time of the last
         // instruction, and trying to sleep until the next
         // instruction execution time.
-        std::thread::sleep(std::time::Duration::from_micros(
-            1000000 / PROCESSOR_SPEED_HZ,
-        ));
+        std::thread::sleep(std::time::Duration::from_micros(1000000 / PROCESSOR_SPEED_HZ));
     }
 }
 
@@ -137,8 +135,7 @@ fn load_rom_file(memory: &mut Memory, path: &Path) -> io::Result<()> {
 
 fn processor_cycle(vm: &mut VM) -> Result<(), String> {
     // Instructions are two bytes
-    let raw_instruction: u16 =
-        (vm.memory[vm.pc as usize] as u16) << 8 | vm.memory[vm.pc as usize + 1] as u16;
+    let raw_instruction: u16 = (vm.memory[vm.pc as usize] as u16) << 8 | vm.memory[vm.pc as usize + 1] as u16;
 
     // println!("instruction {:#04X?} (PC: {:#04X?})", instruction, &current_pc);
 
@@ -234,8 +231,8 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
                     // Bit shift to get the current row bit
                     let sprite_bit: bool = ((sprite_row >> (7 - i)) & 0b1) == 1;
 
-		    let x = (dx + i) as usize;
-		    let y = (dy + j) as usize;
+                    let x = (dx + i) as usize;
+                    let y = (dy + j) as usize;
                     let pixel = vm.display.get_pixel(x, y);
                     if pixel && sprite_bit {
                         // Set collision register
