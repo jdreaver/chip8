@@ -4,30 +4,45 @@ pub(crate) const DISPLAY_WIDTH_PX: usize = 64;
 pub(crate) const DISPLAY_HEIGHT_PX: usize = 32;
 pub(crate) const PIXEL_SCALE_FACTOR: usize = 8;
 
-pub(crate) struct Display([[bool; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX]);
+pub(crate) struct Display {
+    pixels: [[bool; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
+
+    /// Set to `true` when the display is modified and we need to
+    /// repaint the canvas.
+    needs_repaint: bool,
+}
 
 impl Display {
     pub(crate) fn new() -> Display {
-	Display([[false; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX])
+	Display {
+	    pixels: [[false; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
+	    needs_repaint: false,
+	}
     }
 
     pub(crate) fn clear(&mut self) {
         for i in 0..DISPLAY_WIDTH_PX {
             for j in 0..DISPLAY_HEIGHT_PX {
-                self.0[i][j] = false;
+                self.pixels[i][j] = false;
             }
         }
+	self.needs_repaint = true;
     }
 
     pub(crate) fn get_pixel(&self, x: usize, y: usize) -> bool {
-	return self.0[x][y]
+	return self.pixels[x][y]
     }
 
     pub(crate) fn set_pixel(&mut self, x: usize, y: usize, val: bool) {
-	self.0[x][y] = val;
+	self.pixels[x][y] = val;
+	self.needs_repaint = true;
     }
 
-    pub(crate) fn paint(&self, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>) {
+    pub(crate) fn paint(&mut self, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>) {
+	if !self.needs_repaint {
+	    return
+	}
+
 	canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
 	canvas.clear();
 
@@ -35,7 +50,7 @@ impl Display {
 
 	for i in 0..DISPLAY_WIDTH_PX {
             for j in 0..DISPLAY_HEIGHT_PX {
-		if self.0[i][j] {
+		if self.pixels[i][j] {
                     let rect = sdl2::rect::Rect::new(
 			(i * PIXEL_SCALE_FACTOR) as i32, // x
 			(j * PIXEL_SCALE_FACTOR) as i32, // y
@@ -51,6 +66,7 @@ impl Display {
 	}
 
 	canvas.present();
+	self.needs_repaint = false;
     }
 }
 
