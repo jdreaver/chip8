@@ -25,12 +25,10 @@ fn main() {
     let rom_path = Path::new(&args[0]);
     let mut vm = VM::new();
 
-    if let Err(err) = load_rom_file(&mut vm.memory, &rom_path) {
+    if let Err(err) = load_rom_file(&mut vm.memory, rom_path) {
         eprintln!("Error loading ROM file {}: {}", &rom_path.display(), err);
         std::process::exit(1);
     }
-
-    let mut canvas = display::create_sdl_window();
 
     loop {
         // TODO: Process SDL events for keypresses
@@ -43,7 +41,7 @@ fn main() {
         // TODO: Only draw display when display is updated
         // (set a bit on instructions in processor_cycle that
         // update the screen)
-        vm.display.paint(&mut canvas);
+        vm.display.paint();
 
         // TODO: Perform more accurate clock speed emulation
         // by using clock_gettime(CLOCK_MONOTONIC, ...),

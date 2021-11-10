@@ -1,11 +1,10 @@
-use sdl2;
-
 pub(crate) const DISPLAY_WIDTH_PX: usize = 64;
 pub(crate) const DISPLAY_HEIGHT_PX: usize = 32;
 pub(crate) const PIXEL_SCALE_FACTOR: usize = 8;
 
 pub(crate) struct Display {
     pixels: [[bool; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
+    canvas: sdl2::render::Canvas<sdl2::video::Window>,
 
     /// Set to `true` when the display is modified and we need to
     /// repaint the canvas.
@@ -17,6 +16,7 @@ impl Display {
 	Display {
 	    pixels: [[false; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
 	    needs_repaint: false,
+	    canvas: create_sdl_window(),
 	}
     }
 
@@ -30,7 +30,7 @@ impl Display {
     }
 
     pub(crate) fn get_pixel(&self, x: usize, y: usize) -> bool {
-	return self.pixels[x][y]
+	self.pixels[x][y]
     }
 
     pub(crate) fn set_pixel(&mut self, x: usize, y: usize, val: bool) {
@@ -38,15 +38,15 @@ impl Display {
 	self.needs_repaint = true;
     }
 
-    pub(crate) fn paint(&mut self, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>) {
+    pub(crate) fn paint(&mut self) {
 	if !self.needs_repaint {
 	    return
 	}
 
-	canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
-	canvas.clear();
+	self.canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
+	self.canvas.clear();
 
-	canvas.set_draw_color(sdl2::pixels::Color::RGB(255, 255, 255)); // White
+	self.canvas.set_draw_color(sdl2::pixels::Color::RGB(255, 255, 255)); // White
 
 	for i in 0..DISPLAY_WIDTH_PX {
             for j in 0..DISPLAY_HEIGHT_PX {
@@ -57,7 +57,7 @@ impl Display {
 			PIXEL_SCALE_FACTOR as u32,       // width
 			PIXEL_SCALE_FACTOR as u32,       // height
                     );
-                    if let Err(err) = canvas.fill_rect(rect) {
+                    if let Err(err) = self.canvas.fill_rect(rect) {
 			eprintln!("Error drawing rectangle {:?}: {}", rect, err);
 			std::process::exit(1);
                     }
@@ -65,12 +65,12 @@ impl Display {
             }
 	}
 
-	canvas.present();
+	self.canvas.present();
 	self.needs_repaint = false;
     }
 }
 
-pub(crate) fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
+fn create_sdl_window() -> sdl2::render::Canvas<sdl2::video::Window> {
     let sdl_context = sdl2::init().expect("failed to init SDL context");
     let video_subsystem = sdl_context
         .video()
