@@ -120,7 +120,7 @@ pub(crate) fn parse_instruction(instruction: u16) -> Result<Instruction, String>
 #[test]
 fn test_parse_instruction() {
     let assert_parse = |raw: u16, instruction: Instruction| {
-	assert_eq!(parse_instruction(raw), Ok(instruction));
+        assert_eq!(parse_instruction(raw), Ok(instruction));
     };
     assert_parse(0x00E0, Instruction::ClearScreen);
     assert_parse(0x00EE, Instruction::SubroutineReturn);

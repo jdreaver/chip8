@@ -13,11 +13,11 @@ pub(crate) struct Display {
 
 impl Display {
     pub(crate) fn new() -> Display {
-	Display {
-	    pixels: [[false; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
-	    needs_repaint: false,
-	    canvas: create_sdl_window(),
-	}
+        Display {
+            pixels: [[false; DISPLAY_HEIGHT_PX]; DISPLAY_WIDTH_PX],
+            needs_repaint: false,
+            canvas: create_sdl_window(),
+        }
     }
 
     pub(crate) fn clear(&mut self) {
@@ -26,47 +26,49 @@ impl Display {
                 self.pixels[i][j] = false;
             }
         }
-	self.needs_repaint = true;
+        self.needs_repaint = true;
     }
 
     pub(crate) fn get_pixel(&self, x: usize, y: usize) -> bool {
-	self.pixels[x][y]
+        self.pixels[x][y]
     }
 
     pub(crate) fn set_pixel(&mut self, x: usize, y: usize, val: bool) {
-	self.pixels[x][y] = val;
-	self.needs_repaint = true;
+        self.pixels[x][y] = val;
+        self.needs_repaint = true;
     }
 
     pub(crate) fn paint(&mut self) {
-	if !self.needs_repaint {
-	    return
-	}
+        if !self.needs_repaint {
+            return;
+        }
 
-	self.canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
-	self.canvas.clear();
+        self.canvas
+            .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
+        self.canvas.clear();
 
-	self.canvas.set_draw_color(sdl2::pixels::Color::RGB(255, 255, 255)); // White
+        self.canvas
+            .set_draw_color(sdl2::pixels::Color::RGB(255, 255, 255)); // White
 
-	for i in 0..DISPLAY_WIDTH_PX {
+        for i in 0..DISPLAY_WIDTH_PX {
             for j in 0..DISPLAY_HEIGHT_PX {
-		if self.pixels[i][j] {
+                if self.pixels[i][j] {
                     let rect = sdl2::rect::Rect::new(
-			(i * PIXEL_SCALE_FACTOR) as i32, // x
-			(j * PIXEL_SCALE_FACTOR) as i32, // y
-			PIXEL_SCALE_FACTOR as u32,       // width
-			PIXEL_SCALE_FACTOR as u32,       // height
+                        (i * PIXEL_SCALE_FACTOR) as i32, // x
+                        (j * PIXEL_SCALE_FACTOR) as i32, // y
+                        PIXEL_SCALE_FACTOR as u32,       // width
+                        PIXEL_SCALE_FACTOR as u32,       // height
                     );
                     if let Err(err) = self.canvas.fill_rect(rect) {
-			eprintln!("Error drawing rectangle {:?}: {}", rect, err);
-			std::process::exit(1);
+                        eprintln!("Error drawing rectangle {:?}: {}", rect, err);
+                        std::process::exit(1);
                     }
-		}
+                }
             }
-	}
+        }
 
-	self.canvas.present();
-	self.needs_repaint = false;
+        self.canvas.present();
+        self.needs_repaint = false;
     }
 }
 

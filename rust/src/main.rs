@@ -10,7 +10,7 @@ use std::io::Read;
 use std::os::unix::prelude::MetadataExt;
 use std::path::Path;
 
-use instruction::{Instruction, parse_instruction};
+use instruction::{parse_instruction, Instruction};
 
 const MEMORY_BYTES: usize = 4096;
 
@@ -148,18 +148,16 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
 
     match parse_instruction(raw_instruction)? {
         Instruction::ClearScreen => vm.display.clear(),
-        Instruction::SubroutineReturn => {
-	    match vm.stack.pop_back() {
-		None => {
-                    eprintln!(
-			"internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})",
-			raw_instruction, vm.pc
-                    );
-                    std::process::exit(1);
-		}
-		Some(pc) => vm.pc = pc,
-	    }
-        }
+        Instruction::SubroutineReturn => match vm.stack.pop_back() {
+            None => {
+                eprintln!(
+                    "internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})",
+                    raw_instruction, vm.pc
+                );
+                std::process::exit(1);
+            }
+            Some(pc) => vm.pc = pc,
+        },
         Instruction::Jump { nnn } => vm.pc = nnn,
         Instruction::SubroutineCall { nnn } => {
             vm.stack.push_back(vm.pc);
@@ -236,14 +234,16 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
                     // Bit shift to get the current row bit
                     let sprite_bit: bool = ((sprite_row >> (7 - i)) & 0b1) == 1;
 
-		    let pixel = vm.display.get_pixel((dx + i) as usize, (dy + j) as usize);
+		    let x = (dx + i) as usize;
+		    let y = (dy + j) as usize;
+                    let pixel = vm.display.get_pixel(x, y);
                     if pixel && sprite_bit {
                         // Set collision register
                         vm.v[0xF] = 1;
                     }
 
                     // XOR with current bit
-                    vm.display.set_pixel((dx + i) as usize, (dy + j) as usize, pixel ^ sprite_bit);
+                    vm.display.set_pixel(x, y, pixel ^ sprite_bit);
                 }
             }
         }
