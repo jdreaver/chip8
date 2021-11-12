@@ -2,7 +2,6 @@ mod display;
 mod instruction;
 
 use std::cmp::min;
-use std::collections::VecDeque;
 use std::env;
 use std::fs::File;
 use std::io;
@@ -61,7 +60,7 @@ struct VM {
     ir: u16,
 
     // Stack is for subroutines
-    stack: VecDeque<u16>,
+    stack: Vec<u16>,
 
     // General purpose registers
     v: [u8; 16],
@@ -82,7 +81,7 @@ impl VM {
             display: display::Display::new(),
             pc: 0x200,
             ir: 0,
-            stack: VecDeque::new(),
+            stack: Vec::new(),
             v: [0; 16],
             keys_pressed: [false; 16],
             delay_timer: 0,
@@ -145,7 +144,7 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
 
     match parse_instruction(raw_instruction)? {
         Instruction::ClearScreen => vm.display.clear(),
-        Instruction::SubroutineReturn => match vm.stack.pop_back() {
+        Instruction::SubroutineReturn => match vm.stack.pop() {
             None => {
                 eprintln!(
                     "internal error: pop from empty stack! instruction {:#04X?} (PC: {:#04X?})",
@@ -157,7 +156,7 @@ fn processor_cycle(vm: &mut VM) -> Result<(), String> {
         },
         Instruction::Jump { nnn } => vm.pc = nnn,
         Instruction::SubroutineCall { nnn } => {
-            vm.stack.push_back(vm.pc);
+            vm.stack.push(vm.pc);
             vm.pc = nnn; // Jump to NNN
         }
         Instruction::SkipVxEqNn { x, nn } => {
